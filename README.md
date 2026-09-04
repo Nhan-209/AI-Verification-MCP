@@ -1,5 +1,7 @@
 # 🧮 MCP Plugin Math: Formal Metacognition & Anti-Hallucination Engine for AI
 
+[English](README.md) | [Tiếng Việt](README_VI.md)
+
 [![Rust CI/CD](https://github.com/Nhan-209/mcp-plugin-math/actions/workflows/ci.yml/badge.svg)](https://github.com/Nhan-209/mcp-plugin-math/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Protocol: MCP 2024-11-05](https://img.shields.io/badge/MCP-2024--11--05-brightgreen.svg)](https://modelcontextprotocol.io)
