@@ -219,16 +219,14 @@ impl CodeAnalyzer {
             }
         }
 
-        if lang_lower.contains("python") || lang_lower == "py" {
-            if code.contains("except:") {
-                warnings.push("Bare 'except:' found. Catch specific exceptions instead.".to_string());
-            }
+        if (lang_lower.contains("python") || lang_lower == "py") && code.contains("except:") {
+            warnings.push("Bare 'except:' found. Catch specific exceptions instead.".to_string());
         }
 
-        if lang_lower.contains("script") || lang_lower == "ts" || lang_lower == "js" {
-            if code.contains("any") {
-                warnings.push("Potential type hole: 'any' type keyword detected.".to_string());
-            }
+        if (lang_lower.contains("script") || lang_lower == "ts" || lang_lower == "js")
+            && code.contains("any")
+        {
+            warnings.push("Potential type hole: 'any' type keyword detected.".to_string());
         }
 
         // Universal check: unchecked index access [0] without length verification

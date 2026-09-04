@@ -68,7 +68,7 @@ impl TextEvaluator {
         }
 
         let sentence_count = cleaned
-            .split(|c| c == '.' || c == '!' || c == '?' || c == '\n')
+            .split(['.', '!', '?', '\n'])
             .filter(|s| !s.trim().is_empty())
             .count()
             .max(1);

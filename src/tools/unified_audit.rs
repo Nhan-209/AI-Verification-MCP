@@ -49,7 +49,7 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
             .executed_steps
             .clone()
             .into_iter()
-            .chain(input.draft_response.clone().into_iter())
+            .chain(input.draft_response.clone())
             .collect();
         let rep = ConstraintEngine::verify(&input.user_requirements, &impl_claims);
 
