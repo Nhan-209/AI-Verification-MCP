@@ -100,9 +100,9 @@ Or on Windows:
 
 ## 🤖 Agentic AI Skill & Rule Integration
 
-This project includes ready-to-use Agent rules and skills in the `.agents/` folder:
-- **Rule (`.agents/rules/math-verification.md`)**: Enforces that AI must invoke `math_audit_cognition` before producing code or completing tasks.
-- **Skill (`.agents/skills/math-metacognition/SKILL.md`)**: Guides the AI on how to structure DAGs, interpret metric breakdowns, and fix violations.
+This project includes ready-to-use Agent rules and skills:
+- **Rule (`rules/math-verification.md`)**: Enforces that AI must invoke `math_audit_cognition` before producing code or completing tasks.
+- **Skill (`skills/math-metacognition/SKILL.md`)**: Guides the AI on how to structure DAGs, interpret metric breakdowns, and fix violations.
 
 ---
 
