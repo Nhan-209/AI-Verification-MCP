@@ -104,7 +104,7 @@ impl PlanDag {
     pub fn record_step(&mut self, task_id: &str) -> Result<String, String> {
         self.execution_log.push(task_id.to_string());
 
-        if let Some(task) = self.tasks.get_mut(task_id) {
+        if let Some(task) = self.tasks.get(task_id) {
             // Check dependencies
             for dep_id in &task.dependencies {
                 if let Some(dep_task) = self.tasks.get(dep_id) {
@@ -116,18 +116,22 @@ impl PlanDag {
                     }
                 }
             }
-            task.status = TaskStatus::Completed;
-            Ok(format!(
-                "Task '{}' executed successfully within planned DAG",
-                task_id
-            ))
         } else {
             // Not in plan: Scope Creep
-            Err(format!(
+            return Err(format!(
                 "Scope creep violation: Task '{}' was executed but not present in approved plan DAG",
                 task_id
-            ))
+            ));
         }
+
+        if let Some(task) = self.tasks.get_mut(task_id) {
+            task.status = TaskStatus::Completed;
+        }
+
+        Ok(format!(
+            "Task '{}' executed successfully within planned DAG",
+            task_id
+        ))
     }
 
     /// Computes formal graph metrics: Coverage (C) and Waste/Scope Creep (W).

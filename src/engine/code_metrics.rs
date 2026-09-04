@@ -37,7 +37,7 @@ impl CodeAnalyzer {
         let lines: Vec<&str> = code.lines().collect();
         let loc = lines.iter().filter(|l| !l.trim().is_empty()).count().max(1);
 
-        let (mut cyclomatic, mut syntax_errors) = Self::ast_analyze(code, lang_hint);
+        let (mut cyclomatic, syntax_errors) = Self::ast_analyze(code, lang_hint);
         if cyclomatic == 0 {
             cyclomatic = Self::heuristic_cyclomatic(code);
         }
@@ -76,16 +76,18 @@ impl CodeAnalyzer {
         let mut parser = Parser::new();
         let lang_lower = lang.to_lowercase();
 
-        let set_res = match lang_lower.as_str() {
-            "rust" | "rs" => parser.set_language(&tree_sitter_rust::LANGUAGE.into()),
+        let lang_supported = match lang_lower.as_str() {
+            "rust" | "rs" => parser.set_language(&tree_sitter_rust::LANGUAGE.into()).is_ok(),
             "typescript" | "ts" | "tsx" | "javascript" | "js" => {
-                parser.set_language(&tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into())
+                parser
+                    .set_language(&tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into())
+                    .is_ok()
             }
-            "python" | "py" => parser.set_language(&tree_sitter_python::LANGUAGE.into()),
-            _ => Err(tree_sitter::LanguageError::VersionTooOld),
+            "python" | "py" => parser.set_language(&tree_sitter_python::LANGUAGE.into()).is_ok(),
+            _ => false,
         };
 
-        if set_res.is_err() {
+        if !lang_supported {
             return (0, 0);
         }
 

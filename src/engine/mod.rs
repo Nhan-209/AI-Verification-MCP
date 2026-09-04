@@ -1,3 +1,5 @@
+#![allow(unused_imports)]
+
 pub mod code_metrics;
 pub mod constraints;
 pub mod dag;
