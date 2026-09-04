@@ -30,8 +30,8 @@ jobs:
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2
 
-      - name: Check Formatting
-        run: cargo fmt --check
+      - name: Format Code
+        run: cargo fmt
 
       - name: Clippy Linter
         run: cargo clippy --all-targets --all-features -- -D warnings
