@@ -11,7 +11,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut stdout = tokio::io::stdout();
 
     while let Some(line) = reader.next_line().await? {
-        let trimmed = line.trim();
+        let mut trimmed = line.trim();
+        if trimmed.starts_with('\u{feff}') {
+            trimmed = &trimmed['\u{feff}'.len_utf8()..];
+        }
         if trimmed.is_empty() {
             continue;
         }
