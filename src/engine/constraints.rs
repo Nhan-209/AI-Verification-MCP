@@ -51,7 +51,10 @@ impl ConstraintEngine {
         }
 
         // Mutual exclusivity / Contradiction checks (P and not P)
-        let contradictions = Self::detect_contradictions(implementations);
+        let mut all_items = Vec::new();
+        all_items.extend_from_slice(requirements);
+        all_items.extend_from_slice(implementations);
+        let contradictions = Self::detect_contradictions(&all_items);
 
         let total_requirements = req_set.len();
         let alignment_score = if total_requirements == 0 {
@@ -78,8 +81,10 @@ impl ConstraintEngine {
         let joined = items.join(" ").to_lowercase();
 
         let contradiction_pairs = [
-            ("do not run local build", "cargo build"),
+            ("no local build", "cargo build"),
             ("no local build", "cargo test"),
+            ("do not run local build", "cargo build"),
+            ("do not run local build", "cargo test"),
             ("public repo", "private repo"),
             ("pure rust", "node c++ addon"),
             ("zero dependencies", "use petgraph"),
