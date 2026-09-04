@@ -18,8 +18,16 @@ impl ConstraintEngine {
     /// Compares required constraints against implementation claims and detects omissions,
     /// scope creep, and direct logical contradictions.
     pub fn verify(requirements: &[String], implementations: &[String]) -> ConstraintReport {
-        let req_set: HashSet<String> = requirements.iter().map(|s| s.trim().to_lowercase()).filter(|s| !s.is_empty()).collect();
-        let impl_set: HashSet<String> = implementations.iter().map(|s| s.trim().to_lowercase()).filter(|s| !s.is_empty()).collect();
+        let req_set: HashSet<String> = requirements
+            .iter()
+            .map(|s| s.trim().to_lowercase())
+            .filter(|s| !s.is_empty())
+            .collect();
+        let impl_set: HashSet<String> = implementations
+            .iter()
+            .map(|s| s.trim().to_lowercase())
+            .filter(|s| !s.is_empty())
+            .collect();
 
         let mut satisfied_count = 0;
         let mut missing = Vec::new();

@@ -93,7 +93,10 @@ impl PlanDag {
                 let order_ids: Vec<String> = order.into_iter().map(|idx| graph[idx].clone()).collect();
                 Ok(order_ids)
             }
-            Err(cycle) => Err(format!("Cycle detected in plan DAG involving task node: {:?}", graph[cycle.node_id()])),
+            Err(cycle) => Err(format!(
+                "Cycle detected in plan DAG involving task node: {:?}",
+                graph[cycle.node_id()]
+            )),
         }
     }
 
@@ -114,7 +117,10 @@ impl PlanDag {
                 }
             }
             task.status = TaskStatus::Completed;
-            Ok(format!("Task '{}' executed successfully within planned DAG", task_id))
+            Ok(format!(
+                "Task '{}' executed successfully within planned DAG",
+                task_id
+            ))
         } else {
             // Not in plan: Scope Creep
             Err(format!(

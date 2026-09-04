@@ -124,7 +124,11 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
             recommendations.push(sug.clone());
         }
 
-        let text_quality = if rep.is_verbose || rep.is_too_complex { 60.0 } else { 95.0 };
+        let text_quality = if rep.is_verbose || rep.is_too_complex {
+            60.0
+        } else {
+            95.0
+        };
         score_components.push(text_quality);
         Some(rep)
     } else {

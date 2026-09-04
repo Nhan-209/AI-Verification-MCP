@@ -5,29 +5,15 @@ Xây dựng MCP Server bằng Rust giúp AI tự kiểm chứng nhận thức b�
 
 ## Tasks
 - [x] Task 1: Khởi tạo kế hoạch chi tiết và thiết lập kiến trúc. → Verify: implementation_plan.md & math-mcp-plugin.md được tạo.
-- [ ] Task 2: Khởi tạo Git repository và cấu hình `.gitignore` chuẩn Rust. → Verify: `git status` hợp lệ.
-- [ ] Task 3: Tạo GitHub public repo `Nhan-209/mcp-plugin-math` qua GitHub CLI. → Verify: `gh repo view` trả về repo public.
-- [ ] Task 4: Thiết lập GitHub Actions CI workflow (`.github/workflows/ci.yml`) cho Rust (fmt, clippy, test, build release). → Verify: File workflow đúng cấu trúc YAML.
-- [ ] Task 5: Viết `Cargo.toml` với đầy đủ dependencies chuẩn xác. → Verify: Cấu hình dependencies hoàn chỉnh.
-- [ ] Task 6: Viết Engine Toán học:
-  - `src/engine/dag.rs`: Đồ thị kế hoạch (Plan DAG, topological order, waste $W$, coverage $C$).
-  - `src/engine/entropy.rs`: Lý thuyết thông tin (Shannon entropy, density, readability, compression ratio).
-  - `src/engine/code_metrics.rs`: AST metrics (McCabe, Halstead, Maintainability Index, boundary conditions).
-  - `src/engine/constraints.rs`: Lý thuyết tập hợp & Kiểm tra mâu thuẫn yêu cầu.
-  → Verify: Mã nguồn Rust hoàn thiện đầy đủ tests đơn vị đi kèm trong từng module.
-- [ ] Task 7: Viết MCP Protocol Server & Tools:
-  - `src/mcp/protocol.rs` & `handlers.rs`: Giao thức JSON-RPC stdio.
-  - `src/tools/unified_audit.rs`: Tool `math_audit_cognition`.
-  - `src/tools/plan_tracker.rs`, `code_evaluator.rs`, `text_evaluator.rs`, `constraint_checker.rs`.
-  - `src/main.rs`: Entrypoint.
-  → Verify: Khung MCP Server và các công cụ sẵn sàng kết nối.
-- [ ] Task 8: Viết Rule & Skill cho Agentic AI:
-  - `.agents/rules/math-verification.md`: Rule bắt buộc gọi MCP kiểm chứng trước khi phản hồi.
-  - `.agents/skills/math-metacognition/SKILL.md`: Skill hướng dẫn mô hình hóa toán học.
-  → Verify: Agent rules & skills được load và tuân thủ chuẩn AG Kit.
-- [ ] Task 9: Viết `README.md` & `LICENSE` (MIT) giải thích cơ sở toán học và cách tích hợp. → Verify: Tài liệu trực quan, rõ ràng.
-- [ ] Task 10: Commit và Push toàn bộ lên GitHub public repository. → Verify: Commit được đẩy thành công lên nhánh `main`.
-- [ ] Task 11: Theo dõi GitHub Actions CI chạy hoàn tất và xanh 100%. → Verify: `gh run list` báo success, không chạy lệnh build nào ở máy thật.
+- [x] Task 2: Khởi tạo Git repository và cấu hình `.gitignore` chuẩn Rust. → Verify: `git status` hợp lệ.
+- [x] Task 3: Tạo GitHub public repo `Nhan-209/mcp-plugin-math` qua GitHub CLI. → Verify: `gh repo view` trả về repo public.
+- [x] Task 4: Thiết lập GitHub Actions CI workflow (`.github/workflows/ci.yml`) cho Rust. → Verify: File workflow đúng cấu trúc YAML.
+- [x] Task 5: Viết `Cargo.toml` với đầy đủ dependencies chuẩn xác. → Verify: Cấu hình dependencies hoàn chỉnh.
+- [x] Task 6: Viết Engine Toán học (dag.rs, entropy.rs, code_metrics.rs, constraints.rs). → Verify: Mã nguồn hoàn thiện với unit tests.
+- [x] Task 7: Viết MCP Protocol Server & Tools (main.rs, protocol.rs, handlers.rs, unified_audit.rs). → Verify: Khung MCP Server sẵn sàng.
+- [x] Task 8: Viết Rule & Skill cho Agentic AI (math-verification.md, SKILL.md). → Verify: Agent rules & skills đầy đủ.
+- [x] Task 9: Viết `README.md` & `LICENSE` (MIT). → Verify: Tài liệu trực quan, rõ ràng.
+- [ ] Task 10: Commit và Push các bản cập nhật định dạng, theo dõi GitHub Actions CI xanh 100%. → Verify: `gh run list` báo success.
 
 ## Done When
 - [ ] Repo GitHub public `Nhan-209/mcp-plugin-math` hoạt động.

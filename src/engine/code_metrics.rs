@@ -230,8 +230,15 @@ impl CodeAnalyzer {
         }
 
         // Universal check: unchecked index access [0] without length verification
-        if code.contains("[0]") && !code.contains(".is_empty()") && !code.contains(".len()") && !code.contains(".length") {
-            warnings.push("Potential IndexOutOfBounds / Panic: '[0]' used without apparent length check.".to_string());
+        if code.contains("[0]")
+            && !code.contains(".is_empty()")
+            && !code.contains(".len()")
+            && !code.contains(".length")
+        {
+            warnings.push(
+                "Potential IndexOutOfBounds / Panic: '[0]' used without apparent length check."
+                    .to_string(),
+            );
         }
 
         warnings
