@@ -45,7 +45,7 @@ pub fn handle_request(req: JsonRpcRequest) -> Option<JsonRpcResponse> {
                     "prompts": {}
                 },
                 "serverInfo": {
-                    "name": "mcp-plugin-math",
+                    "name": "ai-verification-mcp",
                     "version": env!("CARGO_PKG_VERSION")
                 }
             })),
@@ -87,15 +87,21 @@ pub fn handle_request(req: JsonRpcRequest) -> Option<JsonRpcResponse> {
             let arguments = params.get("arguments").cloned().unwrap_or(json!({}));
 
             let result = match tool_name {
-                "math_audit_cognition" => execute_unified_audit(arguments),
-                "math_track_dag" => execute_plan_tracker(arguments),
-                "math_eval_code" => execute_code_evaluator(arguments),
-                "math_eval_diff" => execute_diff_checker(arguments),
-                "math_eval_text" => execute_text_evaluator(arguments),
-                "math_confidence" => execute_confidence_checker(arguments),
-                "math_audit_research" => execute_research_checker(arguments),
-                "math_eval_foresight" => execute_foresight_checker(arguments),
-                "math_verify_constraints" => execute_constraint_checker(arguments),
+                // Primary unified governance gate & aliases
+                "verify_agent" | "ai_audit_cognition" | "math_audit_cognition" => {
+                    execute_unified_audit(arguments)
+                }
+                // Granular diagnostic tools & legacy aliases
+                "verify_dag" | "math_track_dag" => execute_plan_tracker(arguments),
+                "verify_code" | "math_eval_code" => execute_code_evaluator(arguments),
+                "verify_diff" | "math_eval_diff" => execute_diff_checker(arguments),
+                "verify_text" | "math_eval_text" => execute_text_evaluator(arguments),
+                "verify_confidence" | "math_confidence" => execute_confidence_checker(arguments),
+                "verify_research" | "math_audit_research" => execute_research_checker(arguments),
+                "verify_foresight" | "math_eval_foresight" => execute_foresight_checker(arguments),
+                "verify_constraints" | "math_verify_constraints" => {
+                    execute_constraint_checker(arguments)
+                }
                 _ => Err(format!("Unknown tool: '{}'", tool_name)),
             };
 
@@ -143,7 +149,7 @@ mod tests {
         assert_eq!(res.id, Some(json!(1)));
         assert!(res.error.is_none());
         let result = res.result.unwrap();
-        assert_eq!(result["serverInfo"]["name"], "mcp-plugin-math");
+        assert_eq!(result["serverInfo"]["name"], "ai-verification-mcp");
     }
 
     #[test]

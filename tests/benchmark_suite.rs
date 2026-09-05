@@ -1,4 +1,4 @@
-use mcp_plugin_math::tools::unified_audit::execute_unified_audit;
+use ai_verification_mcp::tools::unified_audit::execute_unified_audit;
 use serde_json::json;
 use std::time::Instant;
 

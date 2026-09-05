@@ -152,7 +152,19 @@ impl TextEvaluator {
             ));
         }
 
-        let is_too_complex = flesch_reading_ease < 30.0 || gunning_fog_index > 17.0;
+        let has_technical_terms = text.contains("```")
+            || text.contains("http://")
+            || text.contains("https://")
+            || text.contains("RFC ")
+            || text.contains(".rs")
+            || text.contains(".ts")
+            || text.contains(".go")
+            || text.contains(".py")
+            || text.contains("::");
+
+        let is_too_complex = !has_technical_terms
+            && word_count >= 40
+            && (flesch_reading_ease < 30.0 || gunning_fog_index > 17.0);
         if is_too_complex {
             suggestions.push(
                 "Text is overly dense, academic, or hard to parse. Shorten sentences and simplify syntax.".to_string(),
