@@ -27,6 +27,43 @@ pub struct ForesightReport {
 pub struct ForesightEngine;
 
 impl ForesightEngine {
+    /// Checks whether a term is present affirmatively or negated by nearby negation tokens.
+    /// Returns `(has_affirmative, has_negated)`.
+    pub fn analyze_term_presence(text: &str, term: &str) -> (bool, bool) {
+        const NEGATION_PREFIXES: &[&str] = &[
+            "no ", "not ", "don't ", "never ", "without ", "lack of ", "lacks ",
+            "chưa có ", "không có ", "không cần ", "bỏ qua ",
+        ];
+
+        let mut search_idx = 0;
+        let mut found_affirmative = false;
+        let mut found_negated = false;
+
+        while let Some(rel_idx) = text[search_idx..].find(term) {
+            let term_idx = search_idx + rel_idx;
+
+            // Extract up to 30 characters safely along char boundaries
+            let prefix = &text[..term_idx];
+            let prefix_window = match prefix.char_indices().rev().nth(30) {
+                Some((byte_idx, _)) => &prefix[byte_idx..],
+                None => prefix,
+            };
+
+            let is_neg = NEGATION_PREFIXES
+                .iter()
+                .any(|&neg| prefix_window.ends_with(neg) || prefix_window.contains(neg));
+
+            if is_neg {
+                found_negated = true;
+            } else {
+                found_affirmative = true;
+            }
+            search_idx = term_idx + term.len();
+        }
+
+        (found_affirmative, found_negated)
+    }
+
     /// Evaluates text, code snippet, and plan structure for proactive foresight.
     pub fn evaluate(
         text: Option<&str>,
@@ -50,9 +87,14 @@ impl ForesightEngine {
             "retry", "null", "none", "recover", "xử lý lỗi", "ngoại lệ", "dự phòng",
         ];
         let mut defensive_matches = 0;
+        let mut explicit_defensive_negations = 0;
         for &term in &defensive_terms {
-            if lower.contains(term) {
+            let (affirmative, negated) = Self::analyze_term_presence(&lower, term);
+            if affirmative {
                 defensive_matches += 1;
+            }
+            if negated && !affirmative {
+                explicit_defensive_negations += 1;
             }
         }
         let defensive_coverage = (defensive_matches as f64 / 3.0).min(1.0);
@@ -64,7 +106,8 @@ impl ForesightEngine {
         ];
         let mut edge_matches = 0;
         for &term in &edge_case_terms {
-            if lower.contains(term) {
+            let (affirmative, _) = Self::analyze_term_presence(&lower, term);
+            if affirmative {
                 edge_matches += 1;
             }
         }
@@ -76,12 +119,14 @@ impl ForesightEngine {
         ];
         let mut verif_matches = 0;
         for &term in &verification_terms {
-            if lower.contains(term) {
+            let (affirmative, _) = Self::analyze_term_presence(&lower, term);
+            if affirmative {
                 verif_matches += 1;
             }
         }
         for &marker in FORESIGHT_MARKERS {
-            if lower.contains(marker) {
+            let (affirmative, _) = Self::analyze_term_presence(&lower, marker);
+            if affirmative {
                 verif_matches += 1;
             }
         }
@@ -109,6 +154,12 @@ impl ForesightEngine {
         };
 
         let mut recommendations = Vec::new();
+        if explicit_defensive_negations > 0 {
+            recommendations.push(
+                "Negated Resilience Anti-Pattern: Explicit omission of defensive mechanisms (e.g. 'no timeout', 'no retry', 'without error handling'). Resilience requires positive implementation."
+                    .to_string(),
+            );
+        }
         if is_lazy_plan {
             recommendations.push(
                 "Lazy Plan Detected: Multiple complex requirements stated, but task breakdown is shallow (<=1 task). Decompose into distinct verifiable steps."
@@ -178,5 +229,14 @@ mod tests {
 
         assert_eq!(report.verdict, "REACTIVE");
         assert!(report.defensive_coverage < 0.5);
+    }
+
+    #[test]
+    fn test_negation_trap_in_defensive_coverage() {
+        let text = "There is no timeout, no retry, and without error handling in our client.";
+        let report = ForesightEngine::evaluate(Some(text), None, 1, 1);
+
+        assert_eq!(report.defensive_coverage, 0.0);
+        assert!(report.recommendations.iter().any(|r| r.contains("Negated Resilience")));
     }
 }

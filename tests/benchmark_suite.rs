@@ -12,7 +12,7 @@ fn test_governance_benchmark_precision_grounded() {
                 {"id": "t2", "name": "add unit tests", "dependencies": ["t1"]}
             ],
             "executed_steps": ["t1", "t2"],
-            "draft_response": "Implemented in helper.rs according to RFC 2119. Verified with 100% test coverage. See: https://docs.rs/serde",
+            "draft_response": "Implemented in src/lib.rs according to RFC 2119. Verified with 100% test coverage. See: https://docs.rs/serde",
             "code_snippet": "fn helper() -> Result<bool, String> { Ok(true) }",
             "language": "rust"
         }),
@@ -20,7 +20,7 @@ fn test_governance_benchmark_precision_grounded() {
             "user_requirements": ["read configuration"],
             "planned_tasks": [{"id": "t1", "name": "read configuration", "dependencies": []}],
             "executed_steps": ["t1"],
-            "draft_response": "Configuration parsed from config.json as specified in RFC 8259. Verified in C:\\Users\\app\\config.json."
+            "draft_response": "Configuration parsed from Cargo.toml as specified in RFC 8259. Verified in Cargo.toml."
         }),
         json!({
             "user_requirements": ["calculate latency"],
@@ -38,13 +38,13 @@ fn test_governance_benchmark_precision_grounded() {
             "user_requirements": ["verify float rounding"],
             "planned_tasks": [{"id": "t1", "name": "verify float rounding", "dependencies": []}],
             "executed_steps": ["t1"],
-            "draft_response": "Float rounding conforms to IEEE 754 standards with epsilon comparisons in src/math.rs."
+            "draft_response": "Float rounding conforms to IEEE 754 standards with epsilon comparisons in src/lib.rs."
         }),
         json!({
             "user_requirements": ["check file status"],
             "planned_tasks": [{"id": "t1", "name": "check file status", "dependencies": []}],
             "executed_steps": ["t1", "view_file"],
-            "draft_response": "File inspected at D:\\laptrinh\\duan\\project\\main.go and validated against go.mod."
+            "draft_response": "File inspected at src/lib.rs and validated against Cargo.toml."
         }),
         json!({
             "user_requirements": ["serialize payload"],
@@ -196,7 +196,7 @@ fn test_governance_benchmark_latency_under_5ms() {
             {"id": "t2", "name": "add unit tests", "dependencies": ["t1"]}
         ],
         "executed_steps": ["t1", "t2"],
-        "draft_response": "According to RFC 2119 and docs.rs, the implementation in helper.rs is verified with unit tests. Reference: https://docs.rs/serde",
+        "draft_response": "According to RFC 2119 and docs.rs, the implementation in src/lib.rs is verified with unit tests. Reference: https://docs.rs/serde",
         "code_snippet": "fn add(a: i32, b: i32) -> i32 { a + b }",
         "language": "rust"
     });

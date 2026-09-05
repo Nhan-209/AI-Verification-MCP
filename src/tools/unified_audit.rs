@@ -111,6 +111,33 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
     let mut recommendations = Vec::new();
     let mut weighted_scores: Vec<WeightedScore> = Vec::new();
 
+    // Deep Mode Invariants: In deep governance mode, explicit requirements and plan DAG are mandatory
+    if is_deep {
+        if input.user_requirements.is_empty() {
+            add_violation(
+                &mut violations,
+                &mut critical_violations,
+                &mut recommendations,
+                "REQUIREMENTS_EVIDENCE_MISSING",
+                "Deep Audit Invariant: Formal user requirements must be supplied in deep audit mode.".to_string(),
+                ViolationSeverity::Critical,
+                "Provide user_requirements array defining the target system contracts.",
+            );
+        }
+
+        if input.planned_tasks.is_empty() {
+            add_violation(
+                &mut violations,
+                &mut critical_violations,
+                &mut recommendations,
+                "PLAN_EVIDENCE_MISSING",
+                "Deep Audit Invariant: Formal plan DAG tasks must be supplied in deep audit mode.".to_string(),
+                ViolationSeverity::Critical,
+                "Provide planned_tasks array specifying the DAG execution graph.",
+            );
+        }
+    }
+
     // 1. Constraint Verification (Standard: 0.30, Quick: 0.50)
     let constraint_report = if !input.user_requirements.is_empty() {
         let mut impl_claims: Vec<String> = Vec::new();
@@ -247,10 +274,10 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
                 &mut recommendations,
                 "PLAN_COVERAGE_DEFICIT",
                 format!(
-                    "Deep Audit Warning: Plan execution incomplete (coverage = {:.1}%)",
+                    "Deep Audit Invariant: Plan execution incomplete (coverage = {:.1}%). Deep governance requires 100% DAG coverage.",
                     metrics.coverage_ratio * 100.0
                 ),
-                ViolationSeverity::Warning,
+                ViolationSeverity::Critical,
                 "Complete all planned tasks in DAG before final delivery.",
             );
         }
@@ -537,12 +564,14 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
         info: info_count,
     };
 
-    let (decision, verdict) = if !has_any_input || weighted_scores.is_empty() {
+    let (decision, verdict) = if critical_count > 0 {
+        ("BLOCK".to_string(), "FAIL".to_string())
+    } else if !has_any_input || weighted_scores.is_empty() {
         (
             "INSUFFICIENT_EVIDENCE".to_string(),
             "UNVERIFIED".to_string(),
         )
-    } else if critical_count > 0 || policy_score < 50.0 {
+    } else if policy_score < 50.0 {
         ("BLOCK".to_string(), "FAIL".to_string())
     } else if warning_count > 0 || policy_score < 75.0 {
         ("WARN".to_string(), "WARN".to_string())

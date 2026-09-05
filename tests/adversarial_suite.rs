@@ -1,5 +1,5 @@
 use ai_verification_mcp::engine::{
-    ConfidenceAnalyzer, ConstraintEngine, EvidenceStatus, ResearchGate,
+    ConfidenceAnalyzer, ConstraintEngine, EvidenceStatus, ForesightEngine, PlanDag, ResearchGate,
 };
 use ai_verification_mcp::tools::unified_audit::execute_unified_audit;
 use serde_json::json;
@@ -160,4 +160,88 @@ fn test_adversarial_cautious_negations_calibrated() {
         "Cautious negations should not produce unverified overconfidence claims"
     );
     assert_ne!(report.verdict, "OVERCONFIDENT");
+}
+
+#[test]
+fn test_domain_spoofing_attacker_url_rejected() {
+    let text = "Benchmark results confirmed at https://github.com.attacker.example/benchmarks.";
+    let report = ResearchGate::audit(text);
+
+    assert_eq!(report.verified_citations_count, 0);
+    assert_eq!(report.unverified_citations_count, 1);
+    assert!(report.has_research_deficit);
+    assert!(!report.claim_analyses[0].is_verified);
+}
+
+#[test]
+fn test_nonexistent_local_file_rejected() {
+    let text = "Throughput benchmark exceeds 50k ops/sec as validated in src/fake_nonexistent_module_xyz123.rs.";
+    let report = ResearchGate::audit(text);
+
+    assert_eq!(report.verified_citations_count, 0);
+    assert_eq!(report.unverified_citations_count, 1);
+    assert!(report.has_research_deficit);
+}
+
+#[test]
+fn test_code_block_alone_not_evidence() {
+    let text = "Throughput benchmark latency is reduced to 1.2ms: ```fn sort() {}```";
+    let report = ResearchGate::audit(text);
+
+    assert_eq!(report.verified_citations_count, 0);
+    assert!(report.has_research_deficit);
+}
+
+#[test]
+fn test_exploratory_action_spoofing_rejected() {
+    assert!(!PlanDag::is_exploratory_action("exfiltrate_test_data"));
+    assert!(!PlanDag::is_exploratory_action("implement_test_suite"));
+    assert!(!PlanDag::is_exploratory_action("delete_test_db"));
+
+    assert!(PlanDag::is_exploratory_action("run_test_suite"));
+    assert!(PlanDag::is_exploratory_action("inspect_logs"));
+    assert!(PlanDag::is_exploratory_action("check_status"));
+}
+
+#[test]
+fn test_dag_transaction_rollback_on_failure() {
+    let mut dag = PlanDag::new();
+    dag.add_task("t1", "create db", vec![]);
+    dag.add_task("t2", "seed db", vec!["t1".to_string()]);
+
+    let result = dag.record_step("t2");
+    assert!(result.is_err());
+
+    assert!(!dag.execution_log.contains(&"t2".to_string()));
+    assert_eq!(dag.execution_log.len(), 0);
+}
+
+#[test]
+fn test_foresight_negation_trap_detected() {
+    let text = "We have no timeout, no retry, and without error handling in our architecture.";
+    let report = ForesightEngine::evaluate(Some(text), None, 1, 1);
+
+    assert_eq!(report.defensive_coverage, 0.0);
+    assert!(report.recommendations.iter().any(|r| r.contains("Negated Resilience")));
+}
+
+#[test]
+fn test_deep_mode_incomplete_coverage_blocked() {
+    let payload = json!({
+        "mode": "deep",
+        "user_requirements": ["implement core feature", "add comprehensive integration tests"],
+        "planned_tasks": [
+            {"id": "t1", "name": "implement core feature", "dependencies": []},
+            {"id": "t2", "name": "add comprehensive integration tests", "dependencies": ["t1"]}
+        ],
+        "executed_steps": ["t1"],
+        "draft_response": "Feature is implemented and verified in src/lib.rs as per RFC 2119. See: https://docs.rs/serde",
+    });
+
+    let res = execute_unified_audit(payload).expect("Unified audit execution failed");
+    assert_eq!(res["decision"], "BLOCK");
+    assert_eq!(res["verdict"], "FAIL");
+    assert!(res["severity_summary"]["critical"].as_u64().unwrap() > 0);
+    let violations = res["violations"].as_array().unwrap();
+    assert!(violations.iter().any(|v| v["code"] == "PLAN_COVERAGE_DEFICIT" && v["severity"] == "Critical"));
 }

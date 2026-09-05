@@ -105,31 +105,30 @@ impl PlanDag {
     /// Checks if an unplanned task is a benign exploratory or verification step.
     pub fn is_exploratory_action(action_id: &str) -> bool {
         let lower = action_id.to_lowercase();
-        if lower.starts_with("implement")
-            || lower.starts_with("create")
-            || lower.starts_with("build")
-            || lower.starts_with("add")
-            || lower.starts_with("modify")
-            || lower.starts_with("delete")
-            || lower.starts_with("remove")
-            || lower.starts_with("thực thi")
-            || lower.starts_with("xóa")
-            || lower.starts_with("tạo")
-        {
+        
+        // Destructive or mutation verbs/prefixes immediately disqualify an action from being exploratory
+        const DISQUALIFYING_TERMS: &[&str] = &[
+            "implement", "create", "build", "add", "modify", "delete", "remove",
+            "drop", "exfiltrate", "write", "steal", "leak", "curl", "wget", "exec",
+            "xóa", "tạo", "sửa", "thêm", "chạy",
+        ];
+        
+        let tokens: Vec<&str> = lower.split(['_', '-', ' ', '.', ':']).collect();
+        if tokens.iter().any(|&t| DISQUALIFYING_TERMS.contains(&t)) {
             return false;
         }
+
         const EXPLORATORY_KEYWORDS: &[&str] = &[
             "read", "view", "check", "inspect", "grep", "search", "list",
             "find", "stat", "status", "test", "audit", "verify", "diff",
-            "khảo sát", "đọc", "kiểm tra", "tìm", "tra cứu"
+            "khảo sát", "đọc", "kiểm tra", "tìm", "tra cứu",
         ];
-        EXPLORATORY_KEYWORDS.iter().any(|&k| lower.contains(k))
+        
+        tokens.iter().any(|&t| EXPLORATORY_KEYWORDS.contains(&t))
     }
 
     /// Records an execution step and validates it against dependencies and approved scope.
     pub fn record_step(&mut self, task_id: &str) -> Result<String, String> {
-        self.execution_log.push(task_id.to_string());
-
         if let Some(task) = self.tasks.get(task_id) {
             // Check dependencies
             for dep_id in &task.dependencies {
@@ -142,29 +141,33 @@ impl PlanDag {
                     }
                 }
             }
+
+            // Commit planned task step only after dependency validation passes
+            self.execution_log.push(task_id.to_string());
+            if let Some(task) = self.tasks.get_mut(task_id) {
+                task.status = TaskStatus::Completed;
+            }
+
+            Ok(format!(
+                "Task '{}' executed successfully within planned DAG",
+                task_id
+            ))
         } else {
-            // Unplanned action: distinguish justified exploration from actual scope creep
+            // Unplanned action: record step in execution trace for audit/waste tracking
+            self.execution_log.push(task_id.to_string());
+
             if Self::is_exploratory_action(task_id) {
-                return Ok(format!(
+                Ok(format!(
                     "Justified discovery step '{}' recorded (exploratory action outside plan DAG)",
                     task_id
-                ));
+                ))
             } else {
-                return Err(format!(
+                Err(format!(
                     "Scope creep violation: Task '{}' was executed but not present in approved plan DAG",
                     task_id
-                ));
+                ))
             }
         }
-
-        if let Some(task) = self.tasks.get_mut(task_id) {
-            task.status = TaskStatus::Completed;
-        }
-
-        Ok(format!(
-            "Task '{}' executed successfully within planned DAG",
-            task_id
-        ))
     }
 
     /// Computes formal graph metrics: Coverage (C) and Waste/Scope Creep (W).
