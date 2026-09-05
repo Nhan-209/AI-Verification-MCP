@@ -4,8 +4,8 @@
 
 [![Rust CI/CD](https://github.com/Nhan-209/mcp-plugin-math/actions/workflows/ci.yml/badge.svg)](https://github.com/Nhan-209/mcp-plugin-math/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Protocol: MCP 2024-11-05](https://img.shields.io/badge/MCP-2024--11--05-brightgreen.svg)](https://modelcontextprotocol.io)
-[![Version: 0.9.0](https://img.shields.io/badge/version-0.9.0-orange.svg)](Cargo.toml)
+[![Protocol: MCP 2026-07-28](https://img.shields.io/badge/MCP-2026--07--28%20%7C%202024--11--05-brightgreen.svg)](https://modelcontextprotocol.io)
+[![Version: 0.9.1](https://img.shields.io/badge/version-0.9.1-orange.svg)](Cargo.toml)
 
 Một **Model Context Protocol (MCP)** Server hiệu năng cực cao viết bằng **Rust**, đóng vai trò là **Tầng Thực Thi Chính Sách & Bằng Chứng Tất Định (Deterministic Evidence & Policy Enforcement Layer)** cho các hệ thống AI Agent. Dự án chuyển hóa các tín hiệu tất định, phân tích cú pháp AST và danh mục nguồn dẫn uy tín thành các rào chắn kỹ thuật (guardrails), áp dụng cơ chế phán quyết 4 cấp (**`ALLOW`**, **`WARN`**, **`BLOCK`**, **`INSUFFICIENT_EVIDENCE`**) với mã vi phạm chuẩn hóa và kế hoạch khắc phục hành động cụ thể (actionable remediation).
 
@@ -21,8 +21,11 @@ Hệ thống loại bỏ hoàn toàn sự phụ thuộc vào các mô hình "LLM
 1. **Tiên đề Dẫn chứng Toàn diện (Universal Grounding Axiom)**: Nếu AI đưa ra các luận điểm kỹ thuật cụ thể, từng luận điểm đều phải có nguồn trích dẫn được xác thực. Dẫn chứng hợp lệ cho Luận điểm A không thể dùng để bảo kê cho Luận điểm B không có bằng chứng.
 2. **Ma trận Bằng chứng Bắt buộc (Mandatory Evidence Matrix)**: Payload khuyết thiếu không thể gian lận điểm số. Ở chế độ `standard`, việc thiếu hợp đồng (`user_requirements` hoặc `planned_tasks`) bắt buộc trả về `INSUFFICIENT_EVIDENCE`. Ở chế độ `deep`, việc thiếu bất kỳ trụ cột nào sẽ dẫn đến `BLOCK`.
 3. **Danh Mục Tiêu Chuẩn Chuẩn Hóa (`KNOWN_RFC_REGISTRY`)**: Loại bỏ việc chấp nhận dải số ngẫu nhiên. Số hiệu RFC phải đối chiếu với `KNOWN_RFC_REGISTRY` và các tổ chức tiêu chuẩn phải đi kèm mã định danh cấu trúc (`IEEE 754`, `ISO/IEC 27001`).
+4. **Rào Chắn Chống Giả Mạo Giai Đoạn (Anti-Phase Spoofing Guard)**: Giai đoạn `audit_phase='plan'` kiểm toán kế hoạch đề xuất mà không phạt độ phủ thực thi, nhưng nghiêm cấm luồn lách sản phẩm thực thi. Việc gửi `executed_steps`, `code_snippet` hoặc văn phong tuyên bố đã hoàn thành trong giai đoạn plan sẽ kích hoạt vi phạm `PHASE_SPOOFING` (`BLOCK`). Phán quyết plan trả về `verdict='PLAN_APPROVED'` và không bao giờ cho phép xuất xưởng (`is_delivery_authorized: false`).
+5. **Hỗ Trợ MCP Revision 2026-07-28**: Tương thích hoàn toàn với giao thức MCP phi trạng thái (stateless) hiện đại, hỗ trợ đàm phán phiên bản tự động và trả về toàn bộ lược đồ công cụ trong một lượt gọi duy nhất qua `server/discover`.
 
 ---
+
 
 ## 🌟 Triết Lý: Rào Chắn Tín Hiệu Tất Định Kiểm Soát & Giám Sát Tác Tử AI
 

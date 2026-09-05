@@ -323,3 +323,127 @@ fn invariant_resource_limit_requirements_rejected() {
     let res = execute_unified_audit(json!({"user_requirements": reqs}));
     assert!(res.is_err(), "Resource limit: 201 requirements must be rejected");
 }
+
+// ─── Anti-Phase Spoofing Invariants ──────────────────────────────────────────
+
+#[test]
+fn invariant_phase_spoofing_executed_steps_blocked() {
+    // Attempting to pass executed_steps under audit_phase='plan' to bypass execution coverage
+    let res = execute_unified_audit(json!({
+        "audit_phase": "plan",
+        "user_requirements": ["implement feature"],
+        "planned_tasks": [{"id": "t1", "name": "implement feature", "dependencies": []}],
+        "executed_steps": ["t1"]
+    }))
+    .expect("audit must evaluate");
+
+    assert_eq!(
+        res["decision"].as_str().unwrap(),
+        "BLOCK",
+        "Phase Spoofing VIOLATION: executed_steps under audit_phase='plan' must produce BLOCK"
+    );
+    let violations = res["violations"].as_array().unwrap();
+    assert!(
+        violations.iter().any(|v| v["code"] == "PHASE_SPOOFING"),
+        "PHASE_SPOOFING violation must be present"
+    );
+}
+
+#[test]
+fn invariant_phase_spoofing_code_snippet_blocked() {
+    // Attempting to deliver code under audit_phase='plan' to bypass code coverage/regression checks
+    let res = execute_unified_audit(json!({
+        "audit_phase": "plan",
+        "user_requirements": ["implement feature"],
+        "planned_tasks": [{"id": "t1", "name": "implement feature", "dependencies": []}],
+        "code_snippet": "fn bypass_execution_check() -> bool { true }"
+    }))
+    .expect("audit must evaluate");
+
+    assert_eq!(
+        res["decision"].as_str().unwrap(),
+        "BLOCK",
+        "Phase Spoofing VIOLATION: code_snippet under audit_phase='plan' must produce BLOCK"
+    );
+    let violations = res["violations"].as_array().unwrap();
+    assert!(
+        violations.iter().any(|v| v["code"] == "PHASE_SPOOFING"),
+        "PHASE_SPOOFING violation must be present"
+    );
+}
+
+#[test]
+fn invariant_phase_spoofing_completion_claim_blocked() {
+    // Attempting to claim final completion in draft_response while using audit_phase='plan'
+    let res = execute_unified_audit(json!({
+        "audit_phase": "plan",
+        "user_requirements": ["implement feature"],
+        "planned_tasks": [{"id": "t1", "name": "implement feature", "dependencies": []}],
+        "draft_response": "I have implemented all requirements and the solution is ready for delivery."
+    }))
+    .expect("audit must evaluate");
+
+    assert_eq!(
+        res["decision"].as_str().unwrap(),
+        "BLOCK",
+        "Phase Spoofing VIOLATION: completion claim in draft_response under audit_phase='plan' must produce BLOCK"
+    );
+    let violations = res["violations"].as_array().unwrap();
+    assert!(
+        violations.iter().any(|v| v["code"] == "PHASE_SPOOFING"),
+        "PHASE_SPOOFING violation must be present"
+    );
+}
+
+#[test]
+fn invariant_plan_phase_never_authorizes_delivery() {
+    // A clean, valid plan receives ALLOW, but verdict is PLAN_APPROVED and delivery is NOT authorized
+    let res = execute_unified_audit(json!({
+        "audit_phase": "plan",
+        "user_requirements": ["encrypt data", "add auth"],
+        "planned_tasks": [
+            {"id": "t1", "name": "encrypt data", "dependencies": []},
+            {"id": "t2", "name": "add auth", "dependencies": ["t1"]}
+        ]
+    }))
+    .expect("audit must evaluate");
+
+    assert_eq!(res["decision"].as_str().unwrap(), "ALLOW");
+    assert_eq!(
+        res["verdict"].as_str().unwrap(),
+        "PLAN_APPROVED",
+        "Plan phase verdict must be PLAN_APPROVED, not PASS"
+    );
+    assert_eq!(
+        res["is_delivery_authorized"].as_bool().unwrap(),
+        false,
+        "is_delivery_authorized must be false under audit_phase='plan'"
+    );
+}
+
+#[test]
+fn invariant_execution_phase_authorizes_delivery_on_allow() {
+    // In execution phase with full happy path, is_delivery_authorized must be true
+    let res = execute_unified_audit(json!({
+        "audit_phase": "execution",
+        "user_requirements": ["implement helper", "add tests"],
+        "planned_tasks": [
+            {"id": "t1", "name": "implement helper", "dependencies": []},
+            {"id": "t2", "name": "add tests", "dependencies": ["t1"]}
+        ],
+        "executed_steps": ["t1", "t2"],
+        "draft_response": "According to docs.rs and RFC 1234, the helper is implemented in helper.rs. See: https://docs.rs/example",
+        "code_snippet": "fn helper() -> Result<bool, String> { Ok(true) }",
+        "language": "rust"
+    }))
+    .expect("audit must evaluate");
+
+    assert_eq!(res["decision"].as_str().unwrap(), "ALLOW");
+    assert_eq!(res["verdict"].as_str().unwrap(), "PASS");
+    assert_eq!(
+        res["is_delivery_authorized"].as_bool().unwrap(),
+        true,
+        "is_delivery_authorized must be true for passing execution phase"
+    );
+}
+

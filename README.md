@@ -4,8 +4,9 @@
 
 [![Rust CI/CD](https://github.com/Nhan-209/mcp-plugin-math/actions/workflows/ci.yml/badge.svg)](https://github.com/Nhan-209/mcp-plugin-math/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Protocol: MCP 2024-11-05](https://img.shields.io/badge/MCP-2024--11--05-brightgreen.svg)](https://modelcontextprotocol.io)
-[![Version: 0.9.0](https://img.shields.io/badge/version-0.9.0-orange.svg)](Cargo.toml)
+[![Protocol: MCP 2026-07-28](https://img.shields.io/badge/MCP-2026--07--28%20%7C%202024--11--05-brightgreen.svg)](https://modelcontextprotocol.io)
+[![Version: 0.9.1](https://img.shields.io/badge/version-0.9.1-orange.svg)](Cargo.toml)
+
 
 An ultra-high-performance **Model Context Protocol (MCP)** Server written in **Rust** that serves as a **Deterministic Evidence & Policy Enforcement Layer for AI Agents**. It evaluates proposed AI actions, plans, diffs, and draft responses against deterministic signals, AST analysis, and curated provenance registries, enforcing 4-tier governance decisions (**`ALLOW`**, **`WARN`**, **`BLOCK`**, **`INSUFFICIENT_EVIDENCE`**) with machine-readable violation codes and actionable remediation advice.
 
@@ -21,8 +22,11 @@ The verifier eliminates reliance on subjective LLM-as-a-judge patterns by execut
 1. **Universal Grounding Axiom**: If an agent makes factual technical claims, every single claim must have verified provenance. A valid citation for Claim A cannot launder ungrounded Claim B.
 2. **Mandatory Evidence Matrix**: Partial input payloads cannot game numerical scores. In `standard` mode, omission of contracts (`user_requirements` or `planned_tasks`) yields `INSUFFICIENT_EVIDENCE`. In `deep` mode, omitting any pillar triggers `BLOCK`.
 3. **Curated Standards Registry**: Permissive numeric ranges are eliminated. RFCs are validated against `KNOWN_RFC_REGISTRY` and standard bodies require structured identifiers (`IEEE 754`, `ISO/IEC 27001`).
+4. **Anti-Phase Spoofing Guard**: `audit_phase='plan'` audits proposed plan DAGs without coverage penalty, but strictly forbids execution artifacts. Passing `executed_steps`, `code_snippet`, or completion claims under plan phase triggers `PHASE_SPOOFING` (`BLOCK`). Plan approvals return `verdict='PLAN_APPROVED'` with `is_delivery_authorized: false`.
+5. **MCP Revision 2026-07-28 Support**: Supports modern stateless MCP protocol with protocol negotiation and full manifest discovery via `server/discover` while maintaining backward compatibility with `2024-11-05`.
 
 ---
+
 
 ## 🌟 The Philosophy: Deterministic Signals Constrain & Audit Agent Behavior
 

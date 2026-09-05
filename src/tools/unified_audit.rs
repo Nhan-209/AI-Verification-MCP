@@ -64,6 +64,10 @@ pub struct UnifiedAuditReport {
     pub policy_score: f64,
     #[serde(default)]
     pub composite_score: f64,
+    #[serde(default)]
+    pub audit_phase: String,
+    #[serde(default)]
+    pub is_delivery_authorized: bool,
     pub severity_summary: SeveritySummary,
     pub math_breakdown: Value,
     pub critical_violations: Vec<String>,
@@ -71,6 +75,7 @@ pub struct UnifiedAuditReport {
     pub recommendations: Vec<String>,
     pub remediation_plan: Vec<String>,
 }
+
 
 struct WeightedScore {
     score: f64,
@@ -194,6 +199,69 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
     let mut critical_violations = Vec::new();
     let mut recommendations = Vec::new();
     let mut weighted_scores: Vec<WeightedScore> = Vec::new();
+
+    // ── Phase Spoofing Invariants (Anti-Evasion Gate) ──────────────────────────
+    if is_plan_phase {
+        // Invariant 1: Plan phase must not contain an execution trace
+        if !input.executed_steps.is_empty() {
+            add_violation(
+                &mut violations,
+                &mut critical_violations,
+                &mut recommendations,
+                "PHASE_SPOOFING",
+                format!(
+                    "Phase Invariant Violation: 'executed_steps' ({}) supplied under audit_phase='plan'. Use audit_phase='execution' to evaluate execution trace.",
+                    input.executed_steps.len()
+                ),
+                ViolationSeverity::Critical,
+                "Set audit_phase to 'execution' when auditing executed tasks, or remove executed_steps for plan-only audit.",
+            );
+        }
+
+        // Invariant 2: Plan phase must not be used to deliver implementation code
+        if input.code_snippet.is_some() {
+            add_violation(
+                &mut violations,
+                &mut critical_violations,
+                &mut recommendations,
+                "PHASE_SPOOFING",
+                "Phase Invariant Violation: 'code_snippet' supplied under audit_phase='plan'. Implementation code requires execution phase verification to measure coverage and regression risk.".to_string(),
+                ViolationSeverity::Critical,
+                "Switch audit_phase to 'execution' to audit implementation code, or remove code_snippet for plan-only audit.",
+            );
+        }
+
+        // Invariant 3: Draft response must not claim delivered completion under plan phase
+        if let Some(ref text) = input.draft_response {
+            let lower_text = text.to_lowercase();
+            const COMPLETION_MARKERS: &[&str] = &[
+                "i have implemented",
+                "here is the implementation",
+                "successfully executed",
+                "i have completed",
+                "all tasks are complete",
+                "task is completed",
+                "implementation is complete",
+                "đã hoàn thành",
+                "đã thực hiện xong",
+                "đã cài đặt xong",
+                "đây là code hoàn chỉnh",
+                "the solution is ready",
+            ];
+            if COMPLETION_MARKERS.iter().any(|&m| lower_text.contains(m)) {
+                add_violation(
+                    &mut violations,
+                    &mut critical_violations,
+                    &mut recommendations,
+                    "PHASE_SPOOFING",
+                    "Phase Invariant Violation: draft_response claims completed delivery under audit_phase='plan'. A plan audit cannot authorize final delivery.".to_string(),
+                    ViolationSeverity::Critical,
+                    "Switch audit_phase to 'execution' and provide executed_steps before delivering final response.",
+                );
+            }
+        }
+    }
+
 
     // Deep Mode Invariants: In deep governance mode, explicit requirements and plan DAG are mandatory
     if is_deep {
@@ -801,9 +869,13 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
         ("BLOCK".to_string(), "FAIL".to_string())
     } else if warning_count > 0 || policy_score < 75.0 {
         ("WARN".to_string(), "WARN".to_string())
+    } else if is_plan_phase {
+        ("ALLOW".to_string(), "PLAN_APPROVED".to_string())
     } else {
         ("ALLOW".to_string(), "PASS".to_string())
     };
+
+    let is_delivery_authorized = decision == "ALLOW" && !is_plan_phase;
 
     let mut remediation_plan: Vec<String> = Vec::new();
     for v in &violations {
@@ -817,10 +889,13 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
         verdict,
         policy_score,
         composite_score,
+        audit_phase: resolved_phase.to_string(),
+        is_delivery_authorized,
         severity_summary,
         math_breakdown: json!({
             "mode": mode_str,
             "audit_phase": resolved_phase,
+            "is_delivery_authorized": is_delivery_authorized,
             "constraints": constraint_report,
             "dag": dag_report,
             "text": text_report,
@@ -834,6 +909,7 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
         recommendations,
         remediation_plan,
     };
+
 
     serde_json::to_value(report).map_err(|e| e.to_string())
 }
