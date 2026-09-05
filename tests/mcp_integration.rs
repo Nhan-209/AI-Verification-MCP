@@ -306,14 +306,13 @@ fn test_integration_mcp_2026_07_28_server_discover() {
 
     let val = res.result.expect("Discovery result must be present");
     assert_eq!(val["protocolVersion"], "2026-07-28");
-    assert_eq!(
-        val["supportedProtocolVersions"],
-        json!(["2026-07-28", "2024-11-05"])
-    );
+    assert_eq!(val["supportedProtocolVersions"], json!(["2026-07-28", "2024-11-05"]));
     assert_eq!(val["serverInfo"]["name"], "ai-verification-mcp");
 
     // In MCP 2026-07-28, server/discover includes tools array directly in the manifest
-    let tools = val["tools"].as_array().expect("Tools must be present in discovery response");
+    let tools = val["tools"]
+        .as_array()
+        .expect("Tools must be present in discovery response");
     assert_eq!(tools.len(), 9, "Discovery manifest must contain all 9 tools");
     assert!(tools.iter().any(|t| t["name"] == "verify_agent"));
 }
@@ -366,4 +365,3 @@ fn test_integration_initialize_version_negotiation() {
     let res_default = handle_request(req_default).expect("initialize must respond");
     assert_eq!(res_default.result.unwrap()["protocolVersion"], "2026-07-28");
 }
-

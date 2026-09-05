@@ -446,4 +446,3 @@ fn invariant_execution_phase_authorizes_delivery_on_allow() {
         "is_delivery_authorized must be true for passing execution phase"
     );
 }
-

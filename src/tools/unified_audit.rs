@@ -76,7 +76,6 @@ pub struct UnifiedAuditReport {
     pub remediation_plan: Vec<String>,
 }
 
-
 struct WeightedScore {
     score: f64,
     weight: f64,
@@ -261,7 +260,6 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
             }
         }
     }
-
 
     // Deep Mode Invariants: In deep governance mode, explicit requirements and plan DAG are mandatory
     if is_deep {
@@ -909,7 +907,6 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
         recommendations,
         remediation_plan,
     };
-
 
     serde_json::to_value(report).map_err(|e| e.to_string())
 }
