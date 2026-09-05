@@ -7,3 +7,9 @@ Thumbs.db
 .agents/
 bin/
 *.exe
+
+# Plan artifacts (never commit temporary agent plans)
+*-plan.md
+*plan.md
+*.plan.md
+

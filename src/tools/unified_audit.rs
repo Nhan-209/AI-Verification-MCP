@@ -228,7 +228,7 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
         let known_ids: std::collections::HashSet<&str> = input.planned_tasks.iter().map(|t| t.id.as_str()).collect();
 
         for task in &input.planned_tasks {
-            if input.executed_steps.contains(&task.id) {
+            if is_plan_phase || input.executed_steps.contains(&task.id) {
                 impl_claims.push(task.name.clone());
             }
         }
