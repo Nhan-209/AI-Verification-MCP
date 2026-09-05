@@ -17,8 +17,8 @@ fn default_language() -> String {
 
 /// Executes the diff checking tool
 pub fn execute_diff_checker(args: Value) -> Result<Value, String> {
-    let input: DiffCheckerInput = serde_json::from_value(args)
-        .map_err(|e| format!("Invalid arguments for math_eval_diff: {}", e))?;
+    let input: DiffCheckerInput =
+        serde_json::from_value(args).map_err(|e| format!("Invalid arguments for math_eval_diff: {}", e))?;
     let report = DiffAnalyzer::analyze(&input.before_code, &input.after_code, &input.language);
     Ok(json!(report))
 }

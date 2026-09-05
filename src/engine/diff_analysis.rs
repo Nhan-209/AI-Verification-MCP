@@ -148,9 +148,7 @@ impl DiffAnalyzer {
         let loc = code.lines().count();
         let mut cyclomatic = 1;
 
-        let tokens = [
-            "if ", "for ", "while ", "match ", "case ", "catch ", "&&", "||", "?",
-        ];
+        let tokens = ["if ", "for ", "while ", "match ", "case ", "catch ", "&&", "||", "?"];
         for line in code.lines() {
             let t_line = line.trim();
             for &token in &tokens {
@@ -177,10 +175,7 @@ impl DiffAnalyzer {
             for &prefix in &prefixes {
                 if t.starts_with(prefix) {
                     if let Some(rest) = t.strip_prefix(prefix) {
-                        let name: String = rest
-                            .chars()
-                            .take_while(|&c| c.is_alphanumeric() || c == '_')
-                            .collect();
+                        let name: String = rest.chars().take_while(|&c| c.is_alphanumeric() || c == '_').collect();
                         if !name.is_empty() {
                             funcs.push(name);
                         }

@@ -88,12 +88,10 @@ const UNTRUSTED_OR_PLACEHOLDER_DOMAINS: &[&str] = &[
 
 /// Curated registry of recognized, published IETF standard RFCs.
 pub const KNOWN_RFC_REGISTRY: &[u32] = &[
-    768, 791, 792, 793, 826, 854, 959, 1034, 1035, 1122, 1123, 1234, 1918, 2024,
-    2045, 2046, 2119, 2131, 2326, 2616, 2818, 2821, 2822, 3261, 3339, 3492, 3550,
-    3986, 4122, 4251, 4252, 4253, 4254, 4346, 4648, 5246, 5280, 5321, 5322, 5869,
-    6066, 6265, 6455, 6749, 6750, 7230, 7231, 7232, 7233, 7234, 7235, 7515, 7519,
-    7540, 7636, 8174, 8259, 8446, 9000, 9001, 9110, 9111, 9112, 9113, 9114, 9204,
-    9218, 9293, 9440,
+    768, 791, 792, 793, 826, 854, 959, 1034, 1035, 1122, 1123, 1234, 1918, 2024, 2045, 2046, 2119, 2131, 2326, 2616,
+    2818, 2821, 2822, 3261, 3339, 3492, 3550, 3986, 4122, 4251, 4252, 4253, 4254, 4346, 4648, 5246, 5280, 5321, 5322,
+    5869, 6066, 6265, 6455, 6749, 6750, 7230, 7231, 7232, 7233, 7234, 7235, 7515, 7519, 7540, 7636, 8174, 8259, 8446,
+    9000, 9001, 9110, 9111, 9112, 9113, 9114, 9204, 9218, 9293, 9440,
 ];
 
 pub struct ResearchGate;
@@ -136,10 +134,7 @@ impl ResearchGate {
         if let Some(pos) = lower.find("iso/iec") {
             let after = lower[pos + 7..].trim_start();
             if after.starts_with(|c: char| c.is_ascii_digit()) {
-                let token: String = after
-                    .chars()
-                    .take_while(|c| c.is_ascii_digit() || *c == '-')
-                    .collect();
+                let token: String = after.chars().take_while(|c| c.is_ascii_digit() || *c == '-').collect();
                 results.push(format!("Recognized standard: ISO/IEC {}", token));
             } else {
                 results.push("Recognized standard: ISO/IEC specification".to_string());
@@ -147,19 +142,13 @@ impl ResearchGate {
         } else if let Some(pos) = lower.find("iso") {
             let after = lower[pos + 3..].trim_start();
             if after.starts_with(|c: char| c.is_ascii_digit()) {
-                let token: String = after
-                    .chars()
-                    .take_while(|c| c.is_ascii_digit() || *c == '-')
-                    .collect();
+                let token: String = after.chars().take_while(|c| c.is_ascii_digit() || *c == '-').collect();
                 results.push(format!("Recognized standard: ISO {}", token));
             }
         }
 
         // W3C recommendation or spec
-        if lower.contains("w3c recommendation")
-            || lower.contains("w3c spec")
-            || lower.contains("w3c standard")
-        {
+        if lower.contains("w3c recommendation") || lower.contains("w3c spec") || lower.contains("w3c standard") {
             results.push("Recognized standard: W3C Recommendation".to_string());
         }
 
@@ -189,17 +178,29 @@ impl ResearchGate {
         if let Some(idx) = lower.find("http://").or_else(|| lower.find("https://")) {
             let url_part = &sentence[idx..];
             let url_token = url_part.split_whitespace().next().unwrap_or("");
-            let clean_url = url_token.trim_matches(|c: char| !c.is_alphanumeric() && c != '/' && c != ':' && c != '-' && c != '.' && c != '_');
+            let clean_url = url_token.trim_matches(|c: char| {
+                !c.is_alphanumeric() && c != '/' && c != ':' && c != '-' && c != '.' && c != '_'
+            });
             let lower_url = clean_url.to_lowercase();
 
             let host_opt = Self::extract_hostname(&lower_url);
-            let is_placeholder = host_opt.as_ref().map(|h| {
-                UNTRUSTED_OR_PLACEHOLDER_DOMAINS.iter().any(|&d| h == d || h.ends_with(&format!(".{}", d)))
-            }).unwrap_or(false);
+            let is_placeholder = host_opt
+                .as_ref()
+                .map(|h| {
+                    UNTRUSTED_OR_PLACEHOLDER_DOMAINS
+                        .iter()
+                        .any(|&d| h == d || h.ends_with(&format!(".{}", d)))
+                })
+                .unwrap_or(false);
 
-            let is_authoritative = host_opt.as_ref().map(|h| {
-                AUTHORITATIVE_DOMAINS.iter().any(|&d| h == d || h.ends_with(&format!(".{}", d)))
-            }).unwrap_or(false);
+            let is_authoritative = host_opt
+                .as_ref()
+                .map(|h| {
+                    AUTHORITATIVE_DOMAINS
+                        .iter()
+                        .any(|&d| h == d || h.ends_with(&format!(".{}", d)))
+                })
+                .unwrap_or(false);
 
             if is_placeholder {
                 sources.push(format!("Placeholder/unverified URL: '{}'", clean_url));
@@ -340,7 +341,10 @@ impl ResearchGate {
                     let clean = w.trim_matches(|c: char| !c.is_alphanumeric());
                     clean.ends_with("ms")
                         && clean.len() >= 3
-                        && clean.trim_end_matches("ms").chars().all(|c| c.is_ascii_digit() || c == '.')
+                        && clean
+                            .trim_end_matches("ms")
+                            .chars()
+                            .all(|c| c.is_ascii_digit() || c == '.')
                 });
 
             let has_spec_claim = lower.contains("supports")
@@ -463,8 +467,7 @@ impl ResearchGate {
         }
         if speculation_ratio > 0.3 {
             recommendations.push(
-                "High Speculation: Stop guessing library behavior. Research the exact API specification."
-                    .to_string(),
+                "High Speculation: Stop guessing library behavior. Research the exact API specification.".to_string(),
             );
         }
 
@@ -513,7 +516,10 @@ mod tests {
         let text = "Version v0.24 is 10x faster according to https://example.com/bench";
         let report = ResearchGate::audit(text);
         assert!(report.unverified_citations_count > 0);
-        assert_eq!(report.claim_analyses[0].evidence_status, EvidenceStatus::EvidencePresent);
+        assert_eq!(
+            report.claim_analyses[0].evidence_status,
+            EvidenceStatus::EvidencePresent
+        );
         assert!(!report.claim_analyses[0].is_verified);
     }
 
@@ -522,7 +528,10 @@ mod tests {
         let text = "According to RFC 999999, latency is 0.5 ms.";
         let report = ResearchGate::audit(text);
         assert!(report.unverified_citations_count > 0);
-        assert_eq!(report.claim_analyses[0].evidence_status, EvidenceStatus::EvidencePresent);
+        assert_eq!(
+            report.claim_analyses[0].evidence_status,
+            EvidenceStatus::EvidencePresent
+        );
         assert!(!report.claim_analyses[0].is_verified);
     }
 
@@ -532,7 +541,10 @@ mod tests {
         let report = ResearchGate::audit(text);
         assert!(report.has_research_deficit);
         assert!(report.unverified_citations_count > 0);
-        assert_eq!(report.claim_analyses[0].evidence_status, EvidenceStatus::EvidencePresent);
+        assert_eq!(
+            report.claim_analyses[0].evidence_status,
+            EvidenceStatus::EvidencePresent
+        );
         assert!(!report.claim_analyses[0].is_verified);
     }
 

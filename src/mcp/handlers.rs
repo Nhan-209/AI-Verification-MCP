@@ -1,9 +1,8 @@
 use crate::mcp::protocol::{CallToolResult, JsonRpcError, JsonRpcRequest, JsonRpcResponse};
 use crate::tools::{
-    execute_code_evaluator, execute_confidence_checker, execute_constraint_checker,
-    execute_diff_checker, execute_foresight_checker, execute_plan_tracker,
-    execute_research_checker, execute_text_evaluator, execute_unified_audit,
-    get_available_tools,
+    execute_code_evaluator, execute_confidence_checker, execute_constraint_checker, execute_diff_checker,
+    execute_foresight_checker, execute_plan_tracker, execute_research_checker, execute_text_evaluator,
+    execute_unified_audit, get_available_tools,
 };
 use serde_json::{json, Value};
 
@@ -19,10 +18,7 @@ pub fn handle_request(req: JsonRpcRequest) -> Option<JsonRpcResponse> {
             result: None,
             error: Some(JsonRpcError {
                 code: -32600,
-                message: format!(
-                    "Invalid Request: jsonrpc version must be '2.0', got '{}'",
-                    req.jsonrpc
-                ),
+                message: format!("Invalid Request: jsonrpc version must be '2.0', got '{}'", req.jsonrpc),
                 data: None,
             }),
         });
@@ -88,9 +84,7 @@ pub fn handle_request(req: JsonRpcRequest) -> Option<JsonRpcResponse> {
 
             let result = match tool_name {
                 // Primary unified governance gate & aliases
-                "verify_agent" | "ai_audit_cognition" | "math_audit_cognition" => {
-                    execute_unified_audit(arguments)
-                }
+                "verify_agent" | "ai_audit_cognition" | "math_audit_cognition" => execute_unified_audit(arguments),
                 // Granular diagnostic tools & legacy aliases
                 "verify_dag" | "math_track_dag" => execute_plan_tracker(arguments),
                 "verify_code" | "math_eval_code" => execute_code_evaluator(arguments),
@@ -99,9 +93,7 @@ pub fn handle_request(req: JsonRpcRequest) -> Option<JsonRpcResponse> {
                 "verify_confidence" | "math_confidence" => execute_confidence_checker(arguments),
                 "verify_research" | "math_audit_research" => execute_research_checker(arguments),
                 "verify_foresight" | "math_eval_foresight" => execute_foresight_checker(arguments),
-                "verify_constraints" | "math_verify_constraints" => {
-                    execute_constraint_checker(arguments)
-                }
+                "verify_constraints" | "math_verify_constraints" => execute_constraint_checker(arguments),
                 _ => Err(format!("Unknown tool: '{}'", tool_name)),
             };
 

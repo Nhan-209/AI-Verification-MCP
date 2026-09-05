@@ -19,8 +19,8 @@ pub use plan_tracker::execute_plan_tracker;
 pub use research_checker::execute_research_checker;
 pub use text_evaluator::execute_text_evaluator;
 pub use unified_audit::{
-    execute_unified_audit, AuditViolation, PlanTaskInput, SeveritySummary, UnifiedAuditInput,
-    UnifiedAuditReport, ViolationSeverity,
+    execute_unified_audit, AuditViolation, PlanTaskInput, SeveritySummary, UnifiedAuditInput, UnifiedAuditReport,
+    ViolationSeverity,
 };
 
 use crate::mcp::protocol::Tool;

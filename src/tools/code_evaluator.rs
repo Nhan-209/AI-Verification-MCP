@@ -14,8 +14,8 @@ fn default_language() -> String {
 }
 
 pub fn execute_code_evaluator(args: Value) -> Result<Value, String> {
-    let input: CodeEvaluatorInput = serde_json::from_value(args)
-        .map_err(|e| format!("Invalid arguments for math_eval_code: {}", e))?;
+    let input: CodeEvaluatorInput =
+        serde_json::from_value(args).map_err(|e| format!("Invalid arguments for math_eval_code: {}", e))?;
 
     let metrics = CodeAnalyzer::analyze(&input.code, &input.language);
     Ok(json!(metrics))

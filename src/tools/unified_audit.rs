@@ -1,6 +1,5 @@
 use crate::engine::{
-    CodeAnalyzer, ConfidenceAnalyzer, ConstraintEngine, ForesightEngine, PlanDag, ResearchGate,
-    TextEvaluator,
+    CodeAnalyzer, ConfidenceAnalyzer, ConstraintEngine, ForesightEngine, PlanDag, ResearchGate, TextEvaluator,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -35,7 +34,6 @@ pub struct UnifiedAuditInput {
     #[serde(default)]
     pub audit_phase: Option<String>,
 }
-
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ViolationSeverity {
@@ -114,8 +112,8 @@ const MAX_TASK_ID_LEN: usize = 64;
 const MAX_TASK_NAME_LEN: usize = 256;
 
 pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
-    let input: UnifiedAuditInput = serde_json::from_value(args)
-        .map_err(|e| format!("Invalid arguments for math_audit_cognition: {}", e))?;
+    let input: UnifiedAuditInput =
+        serde_json::from_value(args).map_err(|e| format!("Invalid arguments for math_audit_cognition: {}", e))?;
 
     // ── Mode validation (reject unknown modes immediately) ────────────────────
     let mode_str = input.mode.as_deref().unwrap_or("standard").to_lowercase();
@@ -227,8 +225,7 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
     // 1. Constraint Verification (Standard: 0.30, Quick: 0.50)
     let constraint_report = if !input.user_requirements.is_empty() {
         let mut impl_claims: Vec<String> = Vec::new();
-        let known_ids: std::collections::HashSet<&str> =
-            input.planned_tasks.iter().map(|t| t.id.as_str()).collect();
+        let known_ids: std::collections::HashSet<&str> = input.planned_tasks.iter().map(|t| t.id.as_str()).collect();
 
         for task in &input.planned_tasks {
             if input.executed_steps.contains(&task.id) {
@@ -496,7 +493,6 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
         None
     };
 
-
     // 3. Text & Epistemic Calibration Evaluation
     let (text_report, confidence_report) = if let Some(ref text) = input.draft_response {
         let rep = if !is_quick {
@@ -507,7 +503,8 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
                     &mut critical_violations,
                     &mut recommendations,
                     "VERBOSITY_WARNING",
-                    "Verbosity Warning: Information density is low with high token redundancy. Condense response.".to_string(),
+                    "Verbosity Warning: Information density is low with high token redundancy. Condense response."
+                        .to_string(),
                     ViolationSeverity::Info,
                     "Condense text, eliminate filler phrases, and state answers concisely.",
                 );
@@ -612,9 +609,7 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
 
     // 5. Foresight & Diligence Evaluation (Skipped in quick mode)
     let foresight_report = if !is_quick
-        && (input.draft_response.is_some()
-            || input.code_snippet.is_some()
-            || !input.planned_tasks.is_empty())
+        && (input.draft_response.is_some() || input.code_snippet.is_some() || !input.planned_tasks.is_empty())
     {
         let f_rep = ForesightEngine::evaluate(
             input.draft_response.as_deref(),
@@ -801,10 +796,7 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
     let (decision, verdict) = if critical_count > 0 {
         ("BLOCK".to_string(), "FAIL".to_string())
     } else if !has_any_input || weighted_scores.is_empty() || !mandatory_contract_met {
-        (
-            "INSUFFICIENT_EVIDENCE".to_string(),
-            "UNVERIFIED".to_string(),
-        )
+        ("INSUFFICIENT_EVIDENCE".to_string(), "UNVERIFIED".to_string())
     } else if policy_score < 50.0 {
         ("BLOCK".to_string(), "FAIL".to_string())
     } else if warning_count > 0 || policy_score < 75.0 {

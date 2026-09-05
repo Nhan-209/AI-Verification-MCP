@@ -11,8 +11,8 @@ pub struct PlanTrackerInput {
 }
 
 pub fn execute_plan_tracker(args: Value) -> Result<Value, String> {
-    let input: PlanTrackerInput = serde_json::from_value(args)
-        .map_err(|e| format!("Invalid arguments for math_track_dag: {}", e))?;
+    let input: PlanTrackerInput =
+        serde_json::from_value(args).map_err(|e| format!("Invalid arguments for math_track_dag: {}", e))?;
 
     let mut dag = PlanDag::new();
     for t in input.tasks {

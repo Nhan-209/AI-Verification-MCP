@@ -57,10 +57,8 @@ impl CodeAnalyzer {
 
         let boundary_warnings = Self::check_boundary_conditions(code, lang_hint);
 
-        let passes_static_quality_gate = syntax_errors == 0
-            && normalized_mi >= 55.0
-            && cyclomatic <= 25
-            && boundary_warnings.is_empty();
+        let passes_static_quality_gate =
+            syntax_errors == 0 && normalized_mi >= 55.0 && cyclomatic <= 25 && boundary_warnings.is_empty();
 
         CodeMetrics {
             language: lang_hint.to_string(),
@@ -166,9 +164,8 @@ impl CodeAnalyzer {
 
     fn calculate_halstead(code: &str) -> HalsteadMetrics {
         let operators_list = [
-            "+", "-", "*", "/", "%", "=", "==", "!=", "<", ">", "<=", ">=", "&&", "||", "!", "&",
-            "|", "^", "<<", ">>", "+=", "-=", "*=", "/=", "->", "=>", "::", ".", ",", ";", "(",
-            ")", "[", "]", "{", "}",
+            "+", "-", "*", "/", "%", "=", "==", "!=", "<", ">", "<=", ">=", "&&", "||", "!", "&", "|", "^", "<<", ">>",
+            "+=", "-=", "*=", "/=", "->", "=>", "::", ".", ",", ";", "(", ")", "[", "]", "{", "}",
         ];
 
         let mut distinct_operators = HashSet::new();
@@ -246,9 +243,7 @@ impl CodeAnalyzer {
             warnings.push("Bare 'except:' found. Catch specific exceptions instead.".to_string());
         }
 
-        if (lang_lower.contains("script") || lang_lower == "ts" || lang_lower == "js")
-            && code.contains("any")
-        {
+        if (lang_lower.contains("script") || lang_lower == "ts" || lang_lower == "js") && code.contains("any") {
             warnings.push("Potential type hole: 'any' type keyword detected.".to_string());
         }
 
@@ -263,10 +258,7 @@ impl CodeAnalyzer {
 
         if lang_lower == "java" {
             if code.contains("catch (Exception ") || code.contains("catch (Throwable ") {
-                warnings.push(
-                    "Catching generic Exception/Throwable detected. Catch specific exceptions."
-                        .to_string(),
-                );
+                warnings.push("Catching generic Exception/Throwable detected. Catch specific exceptions.".to_string());
             }
             if code.contains("System.exit(") {
                 warnings.push("System.exit() found in library or service code.".to_string());
@@ -279,8 +271,7 @@ impl CodeAnalyzer {
             }
             if code.contains("strcpy(") || code.contains("sprintf(") || code.contains("gets(") {
                 warnings.push(
-                    "Unsafe C library function (buffer overflow risk: strcpy/sprintf/gets) detected."
-                        .to_string(),
+                    "Unsafe C library function (buffer overflow risk: strcpy/sprintf/gets) detected.".to_string(),
                 );
             }
         }
@@ -291,10 +282,7 @@ impl CodeAnalyzer {
             && !code.contains(".len()")
             && !code.contains(".length")
         {
-            warnings.push(
-                "Potential IndexOutOfBounds / Panic: '[0]' used without apparent length check."
-                    .to_string(),
-            );
+            warnings.push("Potential IndexOutOfBounds / Panic: '[0]' used without apparent length check.".to_string());
         }
 
         warnings

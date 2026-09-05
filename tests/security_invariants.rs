@@ -1,4 +1,4 @@
-﻿use ai_verification_mcp::tools::unified_audit::execute_unified_audit;
+use ai_verification_mcp::tools::unified_audit::execute_unified_audit;
 use serde_json::json;
 
 /// Security Invariants Test Suite
@@ -12,8 +12,11 @@ use serde_json::json;
 fn invariant_1_empty_input_never_allow() {
     let res = execute_unified_audit(json!({})).expect("audit must not error on empty");
     let decision = res["decision"].as_str().unwrap();
-    assert_ne!(decision, "ALLOW",
-        "Invariant 1 VIOLATED: Empty input must never receive ALLOW, got: {}", decision);
+    assert_ne!(
+        decision, "ALLOW",
+        "Invariant 1 VIOLATED: Empty input must never receive ALLOW, got: {}",
+        decision
+    );
 }
 
 // ─── Invariant 2: Unknown dependency NEVER produces ALLOW ────────────────────
@@ -25,13 +28,19 @@ fn invariant_2_unknown_dependency_never_allow() {
             {"id": "t2", "name": "deploy to production", "dependencies": ["security_review"]}
         ],
         "executed_steps": ["t2"]
-    })).expect("audit must not error");
+    }))
+    .expect("audit must not error");
     let decision = res["decision"].as_str().unwrap();
-    assert_eq!(decision, "BLOCK",
-        "Invariant 2 VIOLATED: Unknown dependency must produce BLOCK, got: {}", decision);
+    assert_eq!(
+        decision, "BLOCK",
+        "Invariant 2 VIOLATED: Unknown dependency must produce BLOCK, got: {}",
+        decision
+    );
     let violations = res["violations"].as_array().unwrap();
-    assert!(violations.iter().any(|v| v["code"] == "DAG_STRUCTURAL_ERROR"),
-        "Invariant 2: DAG_STRUCTURAL_ERROR violation must be present");
+    assert!(
+        violations.iter().any(|v| v["code"] == "DAG_STRUCTURAL_ERROR"),
+        "Invariant 2: DAG_STRUCTURAL_ERROR violation must be present"
+    );
 }
 
 #[test]
@@ -40,10 +49,14 @@ fn invariant_2b_unknown_dependency_plan_only_blocked() {
         "planned_tasks": [
             {"id": "t1", "name": "seed db", "dependencies": ["build_database"]}
         ]
-    })).expect("audit must not error");
+    }))
+    .expect("audit must not error");
     let decision = res["decision"].as_str().unwrap();
-    assert_eq!(decision, "BLOCK",
-        "Invariant 2b VIOLATED: Plan-only unknown dependency must BLOCK, got: {}", decision);
+    assert_eq!(
+        decision, "BLOCK",
+        "Invariant 2b VIOLATED: Plan-only unknown dependency must BLOCK, got: {}",
+        decision
+    );
 }
 
 // ─── Invariant 3: Cycle in DAG NEVER produces ALLOW ─────────────────────────
@@ -56,10 +69,14 @@ fn invariant_3_cycle_never_allow() {
             {"id": "b", "name": "step b", "dependencies": ["a"]}
         ],
         "executed_steps": ["a", "b"]
-    })).expect("audit must not error");
+    }))
+    .expect("audit must not error");
     let decision = res["decision"].as_str().unwrap();
-    assert_eq!(decision, "BLOCK",
-        "Invariant 3 VIOLATED: Cyclic DAG must produce BLOCK, got: {}", decision);
+    assert_eq!(
+        decision, "BLOCK",
+        "Invariant 3 VIOLATED: Cyclic DAG must produce BLOCK, got: {}",
+        decision
+    );
 }
 
 #[test]
@@ -69,10 +86,14 @@ fn invariant_3b_cycle_without_steps_blocked() {
             {"id": "x", "name": "task x", "dependencies": ["y"]},
             {"id": "y", "name": "task y", "dependencies": ["x"]}
         ]
-    })).expect("audit must not error");
+    }))
+    .expect("audit must not error");
     let decision = res["decision"].as_str().unwrap();
-    assert_eq!(decision, "BLOCK",
-        "Invariant 3b VIOLATED: Cycle without steps must BLOCK, got: {}", decision);
+    assert_eq!(
+        decision, "BLOCK",
+        "Invariant 3b VIOLATED: Cycle without steps must BLOCK, got: {}",
+        decision
+    );
 }
 
 // ─── Invariant 4: Duplicate task ID NEVER produces ALLOW ─────────────────────
@@ -85,13 +106,19 @@ fn invariant_4_duplicate_task_id_never_allow() {
             {"id": "t1", "name": "deploy to prod", "dependencies": []}
         ],
         "executed_steps": ["t1"]
-    })).expect("audit must not error");
+    }))
+    .expect("audit must not error");
     let decision = res["decision"].as_str().unwrap();
-    assert_eq!(decision, "BLOCK",
-        "Invariant 4 VIOLATED: Duplicate task ID must produce BLOCK, got: {}", decision);
+    assert_eq!(
+        decision, "BLOCK",
+        "Invariant 4 VIOLATED: Duplicate task ID must produce BLOCK, got: {}",
+        decision
+    );
     let violations = res["violations"].as_array().unwrap();
-    assert!(violations.iter().any(|v| v["code"] == "DUPLICATE_TASK_ID"),
-        "Invariant 4: DUPLICATE_TASK_ID violation must be present");
+    assert!(
+        violations.iter().any(|v| v["code"] == "DUPLICATE_TASK_ID"),
+        "Invariant 4: DUPLICATE_TASK_ID violation must be present"
+    );
 }
 
 // ─── Invariant 5: Empty/whitespace task ID NEVER produces ALLOW ──────────────
@@ -103,13 +130,19 @@ fn invariant_5_empty_task_id_never_allow() {
             {"id": "", "name": "anonymous task", "dependencies": []},
             {"id": "   ", "name": "whitespace task", "dependencies": []}
         ]
-    })).expect("audit must not error");
+    }))
+    .expect("audit must not error");
     let decision = res["decision"].as_str().unwrap();
-    assert_eq!(decision, "BLOCK",
-        "Invariant 5 VIOLATED: Empty task ID must produce BLOCK, got: {}", decision);
+    assert_eq!(
+        decision, "BLOCK",
+        "Invariant 5 VIOLATED: Empty task ID must produce BLOCK, got: {}",
+        decision
+    );
     let violations = res["violations"].as_array().unwrap();
-    assert!(violations.iter().any(|v| v["code"] == "INVALID_TASK_ID"),
-        "Invariant 5: INVALID_TASK_ID violation must be present");
+    assert!(
+        violations.iter().any(|v| v["code"] == "INVALID_TASK_ID"),
+        "Invariant 5: INVALID_TASK_ID violation must be present"
+    );
 }
 
 // ─── Invariant 13: Unknown mode is REJECTED with Err ─────────────────────────
@@ -120,11 +153,17 @@ fn invariant_13_unknown_mode_rejected() {
         "mode": "MAXIMUM_SECURITY",
         "planned_tasks": [{"id": "t1", "name": "do task", "dependencies": []}]
     }));
-    assert!(res.is_err(),
-        "Invariant 13 VIOLATED: Unknown mode must return Err, not Ok({:?})", res.ok());
+    assert!(
+        res.is_err(),
+        "Invariant 13 VIOLATED: Unknown mode must return Err, not Ok({:?})",
+        res.ok()
+    );
     let err = res.unwrap_err();
-    assert!(err.contains("Invalid mode"),
-        "Invariant 13: Error must mention 'Invalid mode', got: {}", err);
+    assert!(
+        err.contains("Invalid mode"),
+        "Invariant 13: Error must mention 'Invalid mode', got: {}",
+        err
+    );
 }
 
 #[test]
@@ -133,8 +172,10 @@ fn invariant_13b_invalid_audit_phase_rejected() {
         "audit_phase": "ultra_deep",
         "planned_tasks": [{"id": "t1", "name": "do task", "dependencies": []}]
     }));
-    assert!(res.is_err(),
-        "Invariant 13b VIOLATED: Unknown audit_phase must return Err");
+    assert!(
+        res.is_err(),
+        "Invariant 13b VIOLATED: Unknown audit_phase must return Err"
+    );
 }
 
 // ─── Plan phase: zero coverage is NOT penalized ──────────────────────────────
@@ -148,10 +189,13 @@ fn invariant_plan_phase_no_coverage_penalty() {
             {"id": "t2", "name": "add auth", "dependencies": ["t1"]}
         ],
         "audit_phase": "plan"
-    })).expect("audit must not error");
+    }))
+    .expect("audit must not error");
     let decision = res["decision"].as_str().unwrap();
-    assert_ne!(decision, "BLOCK",
-        "Plan phase VIOLATED: Valid plan-only audit must not BLOCK due to zero coverage");
+    assert_ne!(
+        decision, "BLOCK",
+        "Plan phase VIOLATED: Valid plan-only audit must not BLOCK due to zero coverage"
+    );
 
     // Auto-detect: no executed_steps → plan phase
     let res2 = execute_unified_audit(json!({
@@ -160,11 +204,18 @@ fn invariant_plan_phase_no_coverage_penalty() {
             {"id": "t1", "name": "encrypt data", "dependencies": []},
             {"id": "t2", "name": "add auth", "dependencies": ["t1"]}
         ]
-    })).expect("audit must not error");
-    assert_eq!(res2["math_breakdown"]["audit_phase"].as_str().unwrap(), "plan",
-        "Auto-detect must resolve to 'plan' when executed_steps is absent");
-    assert_ne!(res2["decision"].as_str().unwrap(), "BLOCK",
-        "Auto-detected plan phase must not BLOCK due to zero coverage");
+    }))
+    .expect("audit must not error");
+    assert_eq!(
+        res2["math_breakdown"]["audit_phase"].as_str().unwrap(),
+        "plan",
+        "Auto-detect must resolve to 'plan' when executed_steps is absent"
+    );
+    assert_ne!(
+        res2["decision"].as_str().unwrap(),
+        "BLOCK",
+        "Auto-detected plan phase must not BLOCK due to zero coverage"
+    );
 }
 
 // ─── Invariant 18: Removing evidence cannot improve verdict ──────────────────
@@ -187,14 +238,27 @@ fn invariant_18_removing_evidence_cannot_improve_verdict() {
     let res_b = execute_unified_audit(payload_b).expect("B must not error");
     let score_a = res_a["policy_score"].as_f64().unwrap_or(0.0);
     let score_b = res_b["policy_score"].as_f64().unwrap_or(0.0);
-    assert!(score_b <= score_a + 1.0,
-        "Invariant 18 VIOLATED: Removing evidence improved score {:.1} → {:.1}", score_a, score_b);
+    assert!(
+        score_b <= score_a + 1.0,
+        "Invariant 18 VIOLATED: Removing evidence improved score {:.1} → {:.1}",
+        score_a,
+        score_b
+    );
 
-    let rank = |d: &str| match d { "ALLOW" => 3, "WARN" => 2, "BLOCK" => 1, _ => 0 };
+    let rank = |d: &str| match d {
+        "ALLOW" => 3,
+        "WARN" => 2,
+        "BLOCK" => 1,
+        _ => 0,
+    };
     let dec_a = res_a["decision"].as_str().unwrap();
     let dec_b = res_b["decision"].as_str().unwrap();
-    assert!(rank(dec_b) <= rank(dec_a),
-        "Invariant 18 VIOLATED: Removing evidence improved decision {} → {}", dec_a, dec_b);
+    assert!(
+        rank(dec_b) <= rank(dec_a),
+        "Invariant 18 VIOLATED: Removing evidence improved decision {} → {}",
+        dec_a,
+        dec_b
+    );
 }
 
 // ─── Invariant 19: Adding critical violation cannot improve verdict ───────────
@@ -220,11 +284,22 @@ fn invariant_19_adding_critical_violation_cannot_improve_verdict() {
     let res_viol = execute_unified_audit(with_violation).expect("violation must not error");
     let dec_base = res_base["decision"].as_str().unwrap();
     let dec_viol = res_viol["decision"].as_str().unwrap();
-    let rank = |d: &str| match d { "ALLOW" => 3, "WARN" => 2, "BLOCK" => 1, _ => 0 };
-    assert!(rank(dec_viol) <= rank(dec_base),
-        "Invariant 19 VIOLATED: Adding critical violation improved decision {} → {}", dec_base, dec_viol);
-    assert_eq!(dec_viol, "BLOCK",
-        "Invariant 19: DAG structural error must produce BLOCK");
+    let rank = |d: &str| match d {
+        "ALLOW" => 3,
+        "WARN" => 2,
+        "BLOCK" => 1,
+        _ => 0,
+    };
+    assert!(
+        rank(dec_viol) <= rank(dec_base),
+        "Invariant 19 VIOLATED: Adding critical violation improved decision {} → {}",
+        dec_base,
+        dec_viol
+    );
+    assert_eq!(
+        dec_viol, "BLOCK",
+        "Invariant 19: DAG structural error must produce BLOCK"
+    );
 }
 
 // ─── Resource limit invariants ────────────────────────────────────────────────
@@ -236,8 +311,10 @@ fn invariant_resource_limit_tasks_rejected() {
         .collect();
     let res = execute_unified_audit(json!({"planned_tasks": tasks}));
     assert!(res.is_err(), "Resource limit: 201 tasks must be rejected with Err");
-    assert!(res.unwrap_err().contains("Resource limit exceeded"),
-        "Error must mention 'Resource limit exceeded'");
+    assert!(
+        res.unwrap_err().contains("Resource limit exceeded"),
+        "Error must mention 'Resource limit exceeded'"
+    );
 }
 
 #[test]

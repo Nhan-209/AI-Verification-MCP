@@ -96,7 +96,8 @@ fn test_governance_benchmark_precision_grounded() {
 
     let precision = allow_count as f64 / total as f64;
     assert_eq!(
-        precision, 1.0,
+        precision,
+        1.0,
         "Precision benchmark failed: Expected 100% ALLOW for grounded cases, got {:.1}%",
         precision * 100.0
     );
@@ -173,11 +174,7 @@ fn test_governance_benchmark_recall_ungrounded() {
         if decision == "BLOCK" || decision == "WARN" || decision == "INSUFFICIENT_EVIDENCE" {
             rejected_count += 1;
         } else {
-            eprintln!(
-                "Ungrounded case #{} escaped detection with ALLOW: {:?}",
-                idx + 1,
-                res
-            );
+            eprintln!("Ungrounded case #{} escaped detection with ALLOW: {:?}", idx + 1, res);
         }
     }
 

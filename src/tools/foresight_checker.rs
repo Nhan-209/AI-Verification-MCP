@@ -13,8 +13,8 @@ pub struct ForesightCheckerInput {
 }
 
 pub fn execute_foresight_checker(args: Value) -> Result<Value, String> {
-    let input: ForesightCheckerInput = serde_json::from_value(args)
-        .map_err(|e| format!("Invalid arguments for math_eval_foresight: {}", e))?;
+    let input: ForesightCheckerInput =
+        serde_json::from_value(args).map_err(|e| format!("Invalid arguments for math_eval_foresight: {}", e))?;
     let report = ForesightEngine::evaluate(
         input.text.as_deref(),
         input.code.as_deref(),

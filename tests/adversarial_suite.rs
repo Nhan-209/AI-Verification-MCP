@@ -19,9 +19,7 @@ fn test_adversarial_empty_payload_insufficient_evidence() {
     assert_eq!(res["composite_score"], 0.0);
     assert_eq!(res["severity_summary"]["critical"], 0);
 
-    let violations = res["violations"]
-        .as_array()
-        .expect("Violations should be an array");
+    let violations = res["violations"].as_array().expect("Violations should be an array");
     assert!(
         violations.iter().any(|v| v["code"] == "NO_INPUT_PROVIDED"),
         "Empty payload must report NO_INPUT_PROVIDED info violation"
@@ -243,7 +241,9 @@ fn test_deep_mode_incomplete_coverage_blocked() {
     assert_eq!(res["verdict"], "FAIL");
     assert!(res["severity_summary"]["critical"].as_u64().unwrap() > 0);
     let violations = res["violations"].as_array().unwrap();
-    assert!(violations.iter().any(|v| v["code"] == "PLAN_COVERAGE_DEFICIT" && v["severity"] == "Critical"));
+    assert!(violations
+        .iter()
+        .any(|v| v["code"] == "PLAN_COVERAGE_DEFICIT" && v["severity"] == "Critical"));
 }
 
 #[test]
@@ -257,7 +257,10 @@ fn test_partial_input_score_gaming_rejected() {
     let res = execute_unified_audit(payload).expect("Unified audit execution failed");
 
     // Assert: Standard mode invariant enforces mandatory contract - score gaming must yield INSUFFICIENT_EVIDENCE
-    assert_ne!(res["decision"], "ALLOW", "Isolated draft response must not receive ALLOW");
+    assert_ne!(
+        res["decision"], "ALLOW",
+        "Isolated draft response must not receive ALLOW"
+    );
     assert_eq!(res["decision"], "INSUFFICIENT_EVIDENCE");
     assert_eq!(res["verdict"], "UNVERIFIED");
     let violations = res["violations"].as_array().unwrap();
@@ -276,7 +279,10 @@ fn test_mixed_evidence_partial_spoofing_rejected() {
     let report = ResearchGate::audit(mixed_text);
 
     // Assert - Engine layer: Claim A does not launder Claim B
-    assert!(report.has_research_deficit, "Universal Grounding: unverified Claim B must trigger research deficit");
+    assert!(
+        report.has_research_deficit,
+        "Universal Grounding: unverified Claim B must trigger research deficit"
+    );
     assert_eq!(report.unverified_claims.len(), 1);
 
     // Act - Unified audit layer
@@ -292,7 +298,9 @@ fn test_mixed_evidence_partial_spoofing_rejected() {
     assert_eq!(res["decision"], "BLOCK");
     assert_eq!(res["verdict"], "FAIL");
     let violations = res["violations"].as_array().unwrap();
-    assert!(violations.iter().any(|v| v["code"] == "RESEARCH_DEFICIT" && v["severity"] == "Critical"));
+    assert!(violations
+        .iter()
+        .any(|v| v["code"] == "RESEARCH_DEFICIT" && v["severity"] == "Critical"));
 }
 
 #[test]
@@ -305,7 +313,10 @@ fn test_uncataloged_rfc_flagged_unverified() {
 
     // Assert
     assert!(report.has_research_deficit);
-    assert_eq!(report.claim_analyses[0].evidence_status, EvidenceStatus::EvidencePresent);
+    assert_eq!(
+        report.claim_analyses[0].evidence_status,
+        EvidenceStatus::EvidencePresent
+    );
     assert!(!report.claim_analyses[0].is_verified);
     assert_eq!(report.verified_citations_count, 0);
     assert_eq!(report.unverified_citations_count, 1);
@@ -323,4 +334,3 @@ fn test_bare_acronym_prose_marker_rejected() {
     assert!(report.has_research_deficit);
     assert_eq!(report.verified_citations_count, 0);
 }
-

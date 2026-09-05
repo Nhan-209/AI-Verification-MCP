@@ -13,11 +13,11 @@ pub struct ConfidenceCheckerInput {
 ///
 /// Wraps `ConfidenceAnalyzer::analyze` and maps errors if arguments are invalid.
 pub fn execute_confidence_checker(args: Value) -> Result<Value, String> {
-    let input: ConfidenceCheckerInput = serde_json::from_value(args)
-        .map_err(|e| format!("Invalid arguments for math_confidence: {}", e))?;
-    
+    let input: ConfidenceCheckerInput =
+        serde_json::from_value(args).map_err(|e| format!("Invalid arguments for math_confidence: {}", e))?;
+
     let report = ConfidenceAnalyzer::analyze(&input.text);
-    
+
     Ok(json!(report))
 }
 

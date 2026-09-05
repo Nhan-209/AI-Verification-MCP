@@ -105,25 +105,58 @@ impl PlanDag {
     /// Checks if an unplanned task is a benign exploratory or verification step.
     pub fn is_exploratory_action(action_id: &str) -> bool {
         let lower = action_id.to_lowercase();
-        
+
         // Destructive or mutation verbs/prefixes immediately disqualify an action from being exploratory
         const DISQUALIFYING_TERMS: &[&str] = &[
-            "implement", "create", "build", "add", "modify", "delete", "remove",
-            "drop", "exfiltrate", "write", "steal", "leak", "curl", "wget", "exec",
-            "xóa", "tạo", "sửa", "thêm", "chạy",
+            "implement",
+            "create",
+            "build",
+            "add",
+            "modify",
+            "delete",
+            "remove",
+            "drop",
+            "exfiltrate",
+            "write",
+            "steal",
+            "leak",
+            "curl",
+            "wget",
+            "exec",
+            "xóa",
+            "tạo",
+            "sửa",
+            "thêm",
+            "chạy",
         ];
-        
+
         let tokens: Vec<&str> = lower.split(['_', '-', ' ', '.', ':']).collect();
         if tokens.iter().any(|&t| DISQUALIFYING_TERMS.contains(&t)) {
             return false;
         }
 
         const EXPLORATORY_KEYWORDS: &[&str] = &[
-            "read", "view", "check", "inspect", "grep", "search", "list",
-            "find", "stat", "status", "test", "audit", "verify", "diff",
-            "khảo sát", "đọc", "kiểm tra", "tìm", "tra cứu",
+            "read",
+            "view",
+            "check",
+            "inspect",
+            "grep",
+            "search",
+            "list",
+            "find",
+            "stat",
+            "status",
+            "test",
+            "audit",
+            "verify",
+            "diff",
+            "khảo sát",
+            "đọc",
+            "kiểm tra",
+            "tìm",
+            "tra cứu",
         ];
-        
+
         tokens.iter().any(|&t| EXPLORATORY_KEYWORDS.contains(&t))
     }
 
@@ -158,10 +191,7 @@ impl PlanDag {
                 task.status = TaskStatus::Completed;
             }
 
-            Ok(format!(
-                "Task '{}' executed successfully within planned DAG",
-                task_id
-            ))
+            Ok(format!("Task '{}' executed successfully within planned DAG", task_id))
         } else {
             // Unplanned action: record step in execution trace for audit/waste tracking
             self.execution_log.push(task_id.to_string());
@@ -317,7 +347,10 @@ mod tests {
         assert!(dag.record_step("run_cargo_test").is_ok());
 
         let metrics = dag.evaluate_metrics();
-        assert_eq!(metrics.scope_creep_count, 0, "Exploratory steps must not count as scope creep");
+        assert_eq!(
+            metrics.scope_creep_count, 0,
+            "Exploratory steps must not count as scope creep"
+        );
         assert_eq!(metrics.justified_explorations.len(), 3);
         assert!(metrics.is_valid);
     }
