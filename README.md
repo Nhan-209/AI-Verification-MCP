@@ -5,9 +5,9 @@
 [![Rust CI/CD](https://github.com/Nhan-209/mcp-plugin-math/actions/workflows/ci.yml/badge.svg)](https://github.com/Nhan-209/mcp-plugin-math/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Protocol: MCP 2024-11-05](https://img.shields.io/badge/MCP-2024--11--05-brightgreen.svg)](https://modelcontextprotocol.io)
-[![Version: 0.5.0](https://img.shields.io/badge/version-0.5.0-orange.svg)](Cargo.toml)
+[![Version: 0.6.0](https://img.shields.io/badge/version-0.6.0-orange.svg)](Cargo.toml)
 
-An ultra-high-performance **Model Context Protocol (MCP)** Server written in **Rust** that serves as an **AI Agent Verification & Governance Layer**. It evaluates proposed AI actions, plans, diffs, and draft responses against deterministic signals and static analysis, enforcing 3-tier governance decisions (**`ALLOW`**, **`WARN`**, **`BLOCK`**) with machine-readable violation codes and actionable remediation advice.
+An ultra-high-performance **Model Context Protocol (MCP)** Server written in **Rust** that serves as an **AI Agent Verification & Governance Layer**. It evaluates proposed AI actions, plans, diffs, and draft responses against deterministic signals and static analysis, enforcing 4-tier governance decisions (**`ALLOW`**, **`WARN`**, **`BLOCK`**, **`INSUFFICIENT_EVIDENCE`**) with machine-readable violation codes and actionable remediation advice.
 
 ---
 
@@ -25,10 +25,10 @@ Large Language Models (LLMs) are inherently probabilistic token predictors. Whil
 `ai-verification-mcp` provides a deterministic **Verification & Governance Gate**. Before executing high-impact actions or sending final responses, agents submit their plan, diffs, and drafts to receive structured feedback:
 
 ```
-[Agent Proposal] ──► [ai-verification-mcp Governance Gate] ──► ALLOW | WARN | BLOCK
-                                                                  ▲
-                                                       Structured Violations
-                                                       & Actionable Remediation
+[Agent Proposal] ──► [ai-verification-mcp Governance Gate] ──► ALLOW | WARN | BLOCK | INSUFFICIENT_EVIDENCE
+                                                                   ▲
+                                                        Structured Violations
+                                                        & Actionable Remediation
 ```
 
 ---
@@ -45,12 +45,15 @@ Execution plans are modeled as a DAG $G = (V, E)$.
 
 ### 2. Epistemic Calibration & Context-Aware Confidence
 - **Context-Aware Confidence Scoring**: Distinguishes between empirical metric assertions (e.g., `"100% test coverage"`, `"p99 latency < 2ms"`) or specification guarantees (`"guaranteed by RFC 2119"`) and genuine ungrounded epistemic overconfidence.
-- **Hedging & Assertion Density**: Distinguishes scientific humility from evasive dodging.
+- **Cautious Negation Whitelist**: Epistemically modest statements (e.g. `"does not guarantee"`, `"does not prove bug-free"`) are recognized as scientific rigor rather than overconfidence.
+- **Per-Sentence Evidence Binding**: Prevents **Evidence Laundering** where a single citation at the top whitelists wild subsequent claims.
 - **Contradiction Detection**: Identifies opposing statements within the same response ($P \wedge \neg P$).
 
-### 3. Empirical Research Gate
+### 3. Empirical Research Gate & 3-Tier Evidence Lifecycle
+- **3-Tier Evidence Verification**: Classifies citations through a deterministic verification pipeline:
+  $$\text{Unsupported} \longrightarrow \text{EvidencePresent} \longrightarrow \text{EvidenceVerified}$$
+  Validates RFC numbers ($1 \le \text{RFC} \le 9999$), authoritative registries (`docs.rs`, `ietf.org`, `crates.io`, `github.com`), and local filesystem paths. Rejects placeholder URLs (`example.com`, `fake.example`).
 - **Claim Diagnostics**: Analyzes technical claims across categories (performance benchmarks, version specs, API contracts).
-- **Evidence Verification**: Verifies presence of grounded evidence (RFC citations, documentation URLs, test logs, source file paths).
 - **Research Deficit Detection**: Unverified claims trigger a `RESEARCH_DEFICIT` violation with targeted remediation instructions.
 
 ### 4. Information Theory & Smart Linguistic Density
@@ -70,19 +73,21 @@ Execution plans are modeled as a DAG $G = (V, E)$.
 
 ### 6. Semantic Constraint & Dynamic Negation Matching
 - **Semantic Constraint Alignment**: Evaluates requirement fulfillment via character n-gram Jaccard matching $J(A, B) = \frac{|A \cap B|}{|A \cup B|}$.
+- **Entity Substitution Guard**: Prevents keyword spoofing where core requirement nouns are substituted by arbitrary implementation entities (e.g. replacing `"secrets"` with `"logs"`).
 - **Dynamic Negation Parsing**: Detects conflicting commitments between constraints and implementation claims.
 
 ---
 
-## 🚦 Governance Decision Model: 3-Tier Policy
+## 🚦 Governance Decision Model: 4-Tier Policy
 
-The unified governance gate (`verify_agent`) evaluates all active pillars and outputs a structured 3-tier decision:
+The unified governance gate (`verify_agent`) evaluates all active pillars and outputs a structured 4-tier decision:
 
 | Decision | Criteria | Agent Behavior |
 |:---:|---|---|
-| **`ALLOW`** | No critical violations, composite score $\ge 75\%$. | Safe to proceed / deliver response. |
+| **`ALLOW`** | No critical violations, policy score $\ge 75\%$. | Safe to proceed / deliver response. |
 | **`WARN`** | No critical violations, but warnings present (e.g. slight verbosity, minor scope waste, or score $50-75\%$). | Agent may proceed but should review suggestions. |
 | **`BLOCK`** | Any critical violation (syntax error, broken DAG order, research deficit, uncalibrated overconfidence, constraint omission) or score $< 50\%$. | Execution halted; agent must apply remediation before retry. |
+| **`INSUFFICIENT_EVIDENCE`** | Empty payload or zero verifiable claims provided (policy score = 0.0, verdict = "UNVERIFIED"). | Verification unperformed; agent must provide actionable plan, code, or claims. |
 
 ### Structured Violation Format
 
@@ -90,6 +95,7 @@ The unified governance gate (`verify_agent`) evaluates all active pillars and ou
 {
   "decision": "BLOCK",
   "verdict": "FAIL",
+  "policy_score": 42.5,
   "composite_score": 42.5,
   "severity_summary": { "critical": 1, "warning": 1, "info": 0 },
   "violations": [

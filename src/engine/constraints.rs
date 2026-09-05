@@ -87,33 +87,63 @@ impl ConstraintEngine {
     }
 
     fn is_semantically_matched(req: &str, imp: &str) -> bool {
-        if imp.contains(req) || req.contains(imp) {
+        let req_clean = req.trim().to_lowercase();
+        let imp_clean = imp.trim().to_lowercase();
+
+        if imp_clean.contains(&req_clean) || req_clean.contains(&imp_clean) {
             return true;
         }
 
-        let jaccard = Self::char_ngram_jaccard(req, imp, 2);
-        let word_overlap = Self::word_overlap_ratio(req, imp);
+        let jaccard = Self::char_ngram_jaccard(&req_clean, &imp_clean, 2);
+        let word_overlap = Self::word_overlap_ratio(&req_clean, &imp_clean);
 
         let stop_words = [
             "must", "be", "in", "the", "a", "an", "for", "to", "of", "with", "and", "by", "all",
-            "is", "use", "using",
+            "is", "use", "using", "support", "supports", "added", "implemented", "have", "has",
             // Vietnamese stop words
             "và", "là", "của", "trong", "cho", "với", "để", "các", "những", "phải", "được", "có",
+            "đã", "sử", "dụng", "thêm",
         ];
-        let key_words_req: Vec<&str> = req
+        let key_words_req: Vec<&str> = req_clean
             .split_whitespace()
             .map(|w| w.trim_matches(|c: char| !c.is_alphanumeric()))
             .filter(|w| !w.is_empty() && !stop_words.contains(w))
             .collect();
 
-        let key_match = if !key_words_req.is_empty() {
-            let matched = key_words_req.iter().filter(|&&w| imp.contains(w)).count();
-            matched as f64 / key_words_req.len() as f64 >= 0.6
+        if key_words_req.is_empty() {
+            return jaccard >= 0.45 || word_overlap >= 0.6;
+        }
+
+        let key_words_imp: Vec<&str> = imp_clean
+            .split_whitespace()
+            .map(|w| w.trim_matches(|c: char| !c.is_alphanumeric()))
+            .filter(|w| !w.is_empty() && !stop_words.contains(w))
+            .collect();
+
+        // Entity Substitution Guard:
+        // Detect when an essential requirement entity is replaced by an unrequested entity (e.g. "secrets" -> "logs")
+        let unfulfilled: Vec<&&str> = key_words_req.iter().filter(|&&w| !imp_clean.contains(w)).collect();
+        let extra: Vec<&&str> = key_words_imp.iter().filter(|&&w| !req_clean.contains(w)).collect();
+        let has_entity_divergence = !unfulfilled.is_empty()
+            && !extra.is_empty()
+            && unfulfilled.iter().any(|w| w.len() >= 4);
+
+        if has_entity_divergence && key_words_req.len() <= 6 {
+            return false;
+        }
+
+        let matched_count = key_words_req.iter().filter(|&&w| imp_clean.contains(w)).count();
+        let key_match_ratio = matched_count as f64 / key_words_req.len() as f64;
+
+        let key_match = if key_words_req.len() >= 3 {
+            key_match_ratio >= 0.75 && matched_count >= (key_words_req.len() - 1)
+        } else if key_words_req.len() == 2 {
+            matched_count == 2
         } else {
-            false
+            matched_count == 1
         };
 
-        jaccard >= 0.25 || word_overlap >= 0.5 || key_match
+        key_match || jaccard >= 0.25 || word_overlap >= 0.50
     }
 
     fn char_ngram_jaccard(a: &str, b: &str, n: usize) -> f64 {
@@ -309,5 +339,16 @@ mod tests {
 
         let report = ConstraintEngine::verify(&reqs, &impls);
         assert!(!report.contradictions.is_empty());
+    }
+
+    #[test]
+    fn test_entity_substitution_rejected() {
+        let reqs = vec!["encrypt all customer secrets at rest".to_string()];
+        let impls = vec!["encrypt customer logs at rest".to_string()];
+
+        let report = ConstraintEngine::verify(&reqs, &impls);
+        assert_eq!(report.satisfied_requirements, 0);
+        assert_eq!(report.missing_requirements.len(), 1);
+        assert!(!report.is_aligned);
     }
 }

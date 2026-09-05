@@ -147,8 +147,21 @@ impl ConfidenceAnalyzer {
         let mut overconfidence_count: f64 = 0.0;
         let mut unverified_claims = Vec::new();
 
+        const CAUTIOUS_NEGATIONS: &[&str] = &[
+            "does not guarantee", "do not guarantee", "cannot guarantee", "not guaranteed",
+            "does not prove", "do not prove", "cannot prove", "not proven",
+            "no guarantee", "not always", "never meant to be",
+            "không đảm bảo", "không cam kết", "chưa chứng minh", "không thể khẳng định",
+        ];
+
         for sentence in &sentences {
             let lower_sentence = sentence.to_lowercase();
+
+            // Epistemically cautious, modest scientific statements should never be penalized
+            if CAUTIOUS_NEGATIONS.iter().any(|&cn| lower_sentence.contains(cn)) {
+                continue;
+            }
+
             for &abs_phrase in OVERCONFIDENCE_PHRASES {
                 if lower_sentence.contains(abs_phrase) {
                     if Self::is_empirical_or_contract_context(&lower_sentence, abs_phrase) {
@@ -156,8 +169,20 @@ impl ConfidenceAnalyzer {
                         continue;
                     }
 
+                    // Per-sentence evidence binding to prevent Evidence Laundering
+                    let sentence_has_direct_evidence = lower_sentence.contains("http://")
+                        || lower_sentence.contains("https://")
+                        || lower_sentence.contains(".rs")
+                        || lower_sentence.contains(".ts")
+                        || lower_sentence.contains(".go")
+                        || lower_sentence.contains(".py")
+                        || sentence.contains("```")
+                        || lower_sentence.contains("rfc ")
+                        || lower_sentence.contains("benchmark")
+                        || lower_sentence.contains("coverage");
+
                     overconfidence_count += 1.0;
-                    if !has_hard_evidence {
+                    if !sentence_has_direct_evidence {
                         unverified_claims.push(format!(
                             "Subjective overconfidence assertion '{}' made without empirical evidence: \"{}\"",
                             abs_phrase, sentence.trim()
@@ -237,7 +262,7 @@ impl ConfidenceAnalyzer {
             + 0.10 * (1.0 - filler_penalty))
             .clamp(0.0, 1.0);
 
-        let overconfidence_penalty = if !has_hard_evidence && overconfidence_count > 0.0 {
+        let overconfidence_penalty = if !unverified_claims.is_empty() {
             (overconfidence_score * 0.5 + 0.2).min(0.6)
         } else {
             (overconfidence_score * 0.2).min(0.2)
@@ -253,7 +278,7 @@ impl ConfidenceAnalyzer {
             .clamp(0.0, 1.0);
 
         // 7. Epistemic Verdict
-        let verdict = if overconfidence_count > 0.0 && !has_hard_evidence {
+        let verdict = if !unverified_claims.is_empty() {
             "OVERCONFIDENT".to_string()
         } else if hedging_ratio > 0.45 && specificity < 0.3 {
             "EVASIVE".to_string()
@@ -389,6 +414,22 @@ mod tests {
         let text = "I will deploy the update. Do not deploy the update. This is fine.";
         let report = ConfidenceAnalyzer::analyze(text);
         assert!(!report.self_contradictions.is_empty());
+    }
+
+    #[test]
+    fn test_cautious_negation_not_overconfident() {
+        let text = "The tests do not prove the implementation is bug-free. The specification does not guarantee ordering.";
+        let report = ConfidenceAnalyzer::analyze(text);
+        assert_eq!(report.overconfidence_score, 0.0);
+        assert!(report.unverified_claims.is_empty());
+    }
+
+    #[test]
+    fn test_evidence_laundering_prevented() {
+        let text = "Reference: https://docs.rs/serde\nThis separate algorithm is guaranteed 100% flawless and will never fail.";
+        let report = ConfidenceAnalyzer::analyze(text);
+        assert!(!report.unverified_claims.is_empty(), "Separate unverified sentence must not be laundered by top citation");
+        assert_eq!(report.verdict, "OVERCONFIDENT");
     }
 
     #[test]

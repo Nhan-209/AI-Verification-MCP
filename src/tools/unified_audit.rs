@@ -57,6 +57,8 @@ pub struct SeveritySummary {
 pub struct UnifiedAuditReport {
     pub decision: String,
     pub verdict: String,
+    pub policy_score: f64,
+    #[serde(default)]
     pub composite_score: f64,
     pub severity_summary: SeveritySummary,
     pub math_breakdown: Value,
@@ -477,17 +479,44 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
         None
     };
 
-    let composite_score = if weighted_scores.is_empty() {
-        100.0
+    let has_any_input = !input.user_requirements.is_empty()
+        || !input.planned_tasks.is_empty()
+        || !input.executed_steps.is_empty()
+        || input
+            .draft_response
+            .as_ref()
+            .map(|s| !s.trim().is_empty())
+            .unwrap_or(false)
+        || input
+            .code_snippet
+            .as_ref()
+            .map(|s| !s.trim().is_empty())
+            .unwrap_or(false);
+
+    if !has_any_input {
+        add_violation(
+            &mut violations,
+            &mut critical_violations,
+            &mut recommendations,
+            "NO_INPUT_PROVIDED",
+            "Empty input payload: Cannot verify empty claims or missing execution trace.".to_string(),
+            ViolationSeverity::Info,
+            "Provide user_requirements, planned_tasks, draft_response, or code_snippet for verification.",
+        );
+    }
+
+    let policy_score = if !has_any_input || weighted_scores.is_empty() {
+        0.0
     } else {
         let total_weight: f64 = weighted_scores.iter().map(|ws| ws.weight).sum();
         let weighted_sum: f64 = weighted_scores.iter().map(|ws| ws.score * ws.weight).sum();
         if total_weight > 0.0 {
             weighted_sum / total_weight
         } else {
-            100.0
+            0.0
         }
     };
+    let composite_score = policy_score;
 
     let critical_count = violations
         .iter()
@@ -508,18 +537,17 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
         info: info_count,
     };
 
-    let decision = if critical_count > 0 || composite_score < 50.0 {
-        "BLOCK".to_string()
-    } else if warning_count > 0 || composite_score < 75.0 {
-        "WARN".to_string()
+    let (decision, verdict) = if !has_any_input || weighted_scores.is_empty() {
+        (
+            "INSUFFICIENT_EVIDENCE".to_string(),
+            "UNVERIFIED".to_string(),
+        )
+    } else if critical_count > 0 || policy_score < 50.0 {
+        ("BLOCK".to_string(), "FAIL".to_string())
+    } else if warning_count > 0 || policy_score < 75.0 {
+        ("WARN".to_string(), "WARN".to_string())
     } else {
-        "ALLOW".to_string()
-    };
-
-    let verdict = match decision.as_str() {
-        "ALLOW" => "PASS".to_string(),
-        "WARN" => "WARN".to_string(),
-        _ => "FAIL".to_string(),
+        ("ALLOW".to_string(), "PASS".to_string())
     };
 
     let mut remediation_plan: Vec<String> = Vec::new();
@@ -532,6 +560,7 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
     let report = UnifiedAuditReport {
         decision,
         verdict,
+        policy_score,
         composite_score,
         severity_summary,
         math_breakdown: json!({
@@ -563,9 +592,10 @@ mod tests {
         let result = execute_unified_audit(args);
         assert!(result.is_ok());
         let val = result.unwrap();
-        assert_eq!(val["decision"], "ALLOW");
-        assert_eq!(val["verdict"], "PASS");
-        assert_eq!(val["composite_score"], 100.0);
+        assert_eq!(val["decision"], "INSUFFICIENT_EVIDENCE");
+        assert_eq!(val["verdict"], "UNVERIFIED");
+        assert_eq!(val["policy_score"], 0.0);
+        assert_eq!(val["composite_score"], 0.0);
         assert_eq!(val["severity_summary"]["critical"], 0);
     }
 
@@ -588,6 +618,7 @@ mod tests {
         assert_eq!(val["decision"], "ALLOW");
         assert_eq!(val["verdict"], "PASS");
         assert!(val["composite_score"].as_f64().unwrap() > 70.0);
+        assert_eq!(val["policy_score"], val["composite_score"]);
         assert_eq!(val["severity_summary"]["critical"], 0);
         assert!(val["critical_violations"].as_array().unwrap().is_empty());
     }

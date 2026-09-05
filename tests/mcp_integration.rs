@@ -49,7 +49,7 @@ fn test_integration_protocol_lifecycle() {
     };
     let list_res = handle_request(list_req).expect("tools/list must respond");
     let tools = list_res.result.unwrap()["tools"].as_array().unwrap().clone();
-    assert_eq!(tools.len(), 9, "Server must expose exactly 9 tools in v0.5.0");
+    assert_eq!(tools.len(), 9, "Server must expose exactly 9 tools in v0.6.0");
     assert_eq!(tools[0]["name"], "verify_agent");
 
     // 5. Resources list & Prompts list

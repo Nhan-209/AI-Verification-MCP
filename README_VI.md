@@ -5,9 +5,9 @@
 [![Rust CI/CD](https://github.com/Nhan-209/mcp-plugin-math/actions/workflows/ci.yml/badge.svg)](https://github.com/Nhan-209/mcp-plugin-math/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Protocol: MCP 2024-11-05](https://img.shields.io/badge/MCP-2024--11--05-brightgreen.svg)](https://modelcontextprotocol.io)
-[![Version: 0.5.0](https://img.shields.io/badge/version-0.5.0-orange.svg)](Cargo.toml)
+[![Version: 0.6.0](https://img.shields.io/badge/version-0.6.0-orange.svg)](Cargo.toml)
 
-Một **Model Context Protocol (MCP)** Server hiệu năng cực cao viết bằng **Rust**, đóng vai trò là **Tầng Quản Trị & Kiểm Toán (Verification & Governance Layer)** cho các hệ thống AI Agent. Dự án chuyển hóa các tín hiệu tất định và phân tích tĩnh thành các rào chắn kỹ thuật (guardrails), áp dụng cơ chế phán quyết 3 cấp (**`ALLOW`**, **`WARN`**, **`BLOCK`**) với mã vi phạm chuẩn hóa và kế hoạch khắc phục hành động cụ thể (actionable remediation).
+Một **Model Context Protocol (MCP)** Server hiệu năng cực cao viết bằng **Rust**, đóng vai trò là **Tầng Quản Trị & Kiểm Toán (Verification & Governance Layer)** cho các hệ thống AI Agent. Dự án chuyển hóa các tín hiệu tất định và phân tích tĩnh thành các rào chắn kỹ thuật (guardrails), áp dụng cơ chế phán quyết 4 cấp (**`ALLOW`**, **`WARN`**, **`BLOCK`**, **`INSUFFICIENT_EVIDENCE`**) với mã vi phạm chuẩn hóa và kế hoạch khắc phục hành động cụ thể (actionable remediation).
 
 ---
 
@@ -25,10 +25,10 @@ Các Mô hình Ngôn ngữ Lớn (LLM) bản chất là các bộ dự đoán to
 `ai-verification-mcp` cung cấp một **Cổng Quản Trị & Kiểm Toán (Governance Gate)** độc lập. Trước khi thực thi hành động quan trọng hoặc gửi câu trả lời hoàn tất, AI gửi kế hoạch, mã diff và bản nháp tới cổng kiểm toán để nhận phản hồi cấu trúc:
 
 ```
-[Đề Xuất Của AI] ──► [Cổng Kiểm Toán ai-verification-mcp] ──► ALLOW | WARN | BLOCK
-                                                                  ▲
-                                                       Mã Vi Phạm & Kế Hoạch
-                                                       Khắc Phục Cụ Thể
+[Đề Xuất Của AI] ──► [Cổng Kiểm Toán ai-verification-mcp] ──► ALLOW | WARN | BLOCK | INSUFFICIENT_EVIDENCE
+                                                                   ▲
+                                                        Mã Vi Phạm & Kế Hoạch
+                                                        Khắc Phục Cụ Thể
 ```
 
 ---
@@ -45,13 +45,16 @@ Kế hoạch thực thi được mô hình hóa thành Đồ thị Có hướng 
 
 ### 2. Hiệu Chuẩn Nhận Thức Phù Hợp Ngữ Cảnh (Context-Aware Confidence)
 - **Nhận diện Ngữ Cảnh Đo Lường Kỹ Thuật**: Phân biệt rõ ràng giữa các khẳng định chỉ số kỹ thuật thực nghiệm (ví dụ: `"100% test coverage"`, `"p99 latency < 2ms"`) hay hợp đồng đặc tả (`"guaranteed by RFC 2119"`) với sự tự tin thái quá vô căn cứ.
-- **Tỷ lệ Do dự & Quyết đoán**: Phân biệt sự thận trọng khoa học với việc nói né tránh, vòng vo.
+- **Danh Sách Phủ Định Khiêm Tốn (Cautious Negation)**: Các câu từ chối cam kết khiêm tốn khoa học (ví dụ: `"không đảm bảo"`, `"does not prove"`) được bảo vệ, không bị phạt là overconfidence.
+- **Chống Rửa Dẫn Chứng (Evidence Laundering)**: Ràng buộc dẫn chứng theo từng câu đơn lẻ thay vì cho phép 1 link ở đầu bảo kê toàn bộ các tuyên bố vô căn cứ bên dưới.
 - **Phát hiện Tự Mâu Thuẫn**: Bắt lỗi mâu thuẫn logic trong cùng một nội dung phản hồi ($P \wedge \neg P$).
 
-### 3. Cổng Nghiên Cứu Thực Nghiệm (Research Gate)
+### 3. Cổng Nghiên Cứu Thực Nghiệm & Vòng Đời Dẫn Chứng 3 Cấp
+- **Quy Trình Xác Thực Dẫn Chứng 3 Cấp**:
+  $$\text{Unsupported} \longrightarrow \text{EvidencePresent} \longrightarrow \text{EvidenceVerified}$$
+  Kiểm tra số hiệu RFC hợp lệ ($1 \le \text{RFC} \le 9999$), domain uy tín (`docs.rs`, `ietf.org`, `crates.io`, `github.com`), đường dẫn file nội bộ; từ chối domain giữ chỗ (`example.com`, `fake.example`).
 - **Chẩn Đoán Khẳng Định Kỹ Thuật**: Phân loại khẳng định theo nhóm (hiệu năng benchmark, phiên bản đặc tả, tính tương thích API).
-- **Xác Thực Dẫn Chứng**: Kiểm tra sự hiện diện của bằng chứng (URL tài liệu, mã RFC, đường dẫn file, log thử nghiệm).
-- **Cảnh Báo Thiếu Hụt Nghiên Cứu (`RESEARCH_DEFICIT`)**: Buộc AI phải trích dẫn tài liệu trước khi đưa ra kết luận.
+- **Cảnh Báo Thiếu Hụt Nghiên Cứu (`RESEARCH_DEFICIT`)**: Buộc AI phải trích dẫn tài liệu uy tín trước khi đưa ra kết luận.
 
 ### 4. Lý Thuyết Thông Tin & Tách Câu Thông Minh
 - **Shannon Entropy**:
@@ -68,21 +71,23 @@ Kế hoạch thực thi được mô hình hóa thành Đồ thị Có hướng 
 - **Chỉ Số Bảo Trì (MI)**: Đảm bảo khả năng bảo trì đạt chuẩn production.
 - **Phân Tích Khác Biệt Mã Nguồn (LCS)**: Đánh giá rủi ro hồi quy trước khi commit.
 
-### 6. Khớp Ngữ Nghĩa Ràng Buộc & Mâu Thuẫn Phủ Định
+### 6. Khớp Ngữ Nghĩa Ràng Buộc & Chống Tráo Đổi Thực Thể
 - **Đối Soát Ngữ Nghĩa**: Đánh giá mức độ hoàn thành yêu cầu qua tương đồng ký tự n-gram Jaccard $J(A, B) = \frac{|A \cap B|}{|A \cup B|}$.
+- **Chống Tráo Đổi Thực Thể (Entity Substitution Guard)**: Ngăn chặn việc hoán đổi danh từ thực thể cốt lõi của bài toán (ví dụ: thay `"secrets"` bằng `"logs"`).
 - **Phân Tích Cú Pháp Phủ Định**: Phát hiện mâu thuẫn giữa cam kết thực thi và ràng buộc người dùng đặt ra.
 
 ---
 
-## 🚦 Cơ Chế Phán Quyết 3 Cấp: ALLOW, WARN, BLOCK
+## 🚦 Cơ Chế Phán Quyết 4 Cấp: ALLOW, WARN, BLOCK, INSUFFICIENT_EVIDENCE
 
 Cổng kiểm toán tổng hợp (`verify_agent`) đưa ra quyết định quản trị rõ ràng:
 
 | Quyết Định | Điều Kiện | Hành Vi Của Agent |
 |:---:|---|---|
-| **`ALLOW`** | Không có vi phạm nghiêm trọng (Critical), điểm tổng hợp $\ge 75\%$. | Được phép tiến hành / bàn giao kết quả. |
+| **`ALLOW`** | Không có vi phạm nghiêm trọng (Critical), điểm tuân thủ chính sách $\ge 75\%$. | Được phép tiến hành / bàn giao kết quả. |
 | **`WARN`** | Không có vi phạm nghiêm trọng, nhưng có cảnh báo (ví dụ câu hơi dài, làm việc ngoài kế hoạch nhẹ, hoặc điểm $50-75\%$). | Được phép tiến hành nhưng nên lưu ý khuyến nghị. |
 | **`BLOCK`** | Có vi phạm nghiêm trọng (lỗi cú pháp AST, sai thứ tự DAG, thiếu nghiên cứu, tự tin thái quá, thiếu yêu cầu) hoặc điểm $< 50\%$. | Dừng thực thi ngay lập tức; AI bắt buộc phải khắc phục theo `remediation_plan` trước khi tiếp tục. |
+| **`INSUFFICIENT_EVIDENCE`** | Payload trống rỗng hoặc không có dữ liệu thực thi để kiểm toán (điểm policy = 0.0, verdict = "UNVERIFIED"). | Chưa thực hiện kiểm toán; AI cần cung cấp kế hoạch, code hoặc dẫn chứng cụ thể. |
 
 ### Cấu Trúc Vi Phạm Chuẩn Hóa
 
@@ -90,6 +95,7 @@ Cổng kiểm toán tổng hợp (`verify_agent`) đưa ra quyết định quả
 {
   "decision": "BLOCK",
   "verdict": "FAIL",
+  "policy_score": 42.5,
   "composite_score": 42.5,
   "severity_summary": { "critical": 1, "warning": 1, "info": 0 },
   "violations": [

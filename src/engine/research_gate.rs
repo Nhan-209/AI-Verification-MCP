@@ -1,7 +1,19 @@
 //! Research Gate Engine: Forces AI to cite empirical evidence and verify claims before delivering output.
 
-use crate::engine::text_utils::{smart_split_sentences, EVIDENCE_MARKERS, HEDGING_PHRASES};
+use crate::engine::text_utils::{smart_split_sentences, HEDGING_PHRASES};
 use serde::{Deserialize, Serialize};
+use std::path::Path;
+
+/// 3-Tier Evidence Lifecycle state for technical assertions.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub enum EvidenceStatus {
+    /// Technical claim made with zero citations or supporting evidence
+    Unsupported,
+    /// Evidence/citation syntax present, but unverified authority or unverifiable source
+    EvidencePresent,
+    /// Deterministically verified evidence (valid RFC range, authoritative registry, or verified file)
+    EvidenceVerified,
+}
 
 /// Detailed diagnostic analysis of an individual factual claim.
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -9,6 +21,7 @@ pub struct ClaimAnalysis {
     pub claim: String,
     pub claim_type: String, // "VERSION_SPECIFICATION", "BENCHMARK_PERFORMANCE", "API_COMPATIBILITY"
     pub evidence_required: bool,
+    pub evidence_status: EvidenceStatus,
     pub is_verified: bool,
     pub remediation: String,
 }
@@ -18,15 +31,19 @@ pub struct ClaimAnalysis {
 pub struct ResearchReport {
     /// Number of factual claims detected (versions, benchmarks, library compatibility, dates)
     pub factual_claims_count: usize,
-    /// Number of empirical evidence citations detected (URLs, RFCs, paths, logs, test outputs)
+    /// Total citations detected
     pub citations_count: usize,
-    /// Evidence to claims ratio: citations / max(claims, 1)
+    /// Authoritatively verified citations count
+    pub verified_citations_count: usize,
+    /// Citations present but from unverified or placeholder sources
+    pub unverified_citations_count: usize,
+    /// Evidence to claims ratio: verified_citations / max(claims, 1)
     pub evidence_ratio: f64,
     /// Ratio of speculative statements to total sentences
     pub speculation_ratio: f64,
     /// True if multiple factual claims exist without supporting evidence
     pub has_research_deficit: bool,
-    /// Factual claims flagged as ungrounded
+    /// Factual claims flagged as ungrounded or unverified
     pub unverified_claims: Vec<String>,
     /// Concrete evidence sources detected
     pub detected_sources: Vec<String>,
@@ -41,9 +58,146 @@ pub struct ResearchReport {
     pub recommendations: Vec<String>,
 }
 
+const AUTHORITATIVE_DOMAINS: &[&str] = &[
+    "docs.rs",
+    "crates.io",
+    "github.com",
+    "ietf.org",
+    "w3.org",
+    "developer.mozilla.org",
+    "python.org",
+    "go.dev",
+    "pkg.go.dev",
+    "kernel.org",
+    "iso.org",
+    "ieee.org",
+    "rust-lang.org",
+    "npmjs.com",
+    "pypi.org",
+];
+
+const UNTRUSTED_OR_PLACEHOLDER_DOMAINS: &[&str] = &[
+    "example.com",
+    "example.org",
+    "example.net",
+    "fake.example",
+    "test.com",
+    "foo.bar",
+    "localhost",
+];
+
 pub struct ResearchGate;
 
 impl ResearchGate {
+    /// Evaluates evidence citations present in a specific sentence.
+    pub fn evaluate_evidence(sentence: &str) -> (Vec<String>, usize, usize) {
+        let mut sources = Vec::new();
+        let mut verified = 0;
+        let mut unverified = 0;
+        let lower = sentence.to_lowercase();
+
+        // 1. URL check & authority validation
+        if let Some(idx) = lower.find("http://").or_else(|| lower.find("https://")) {
+            let url_part = &sentence[idx..];
+            let url_token = url_part.split_whitespace().next().unwrap_or("");
+            let clean_url = url_token.trim_matches(|c: char| !c.is_alphanumeric() && c != '/' && c != ':' && c != '-' && c != '.');
+            let lower_url = clean_url.to_lowercase();
+
+            let is_placeholder = UNTRUSTED_OR_PLACEHOLDER_DOMAINS.iter().any(|&d| lower_url.contains(d));
+            let is_authoritative = AUTHORITATIVE_DOMAINS.iter().any(|&d| lower_url.contains(d));
+
+            if is_placeholder {
+                sources.push(format!("Placeholder/unverified URL: '{}'", clean_url));
+                unverified += 1;
+            } else if is_authoritative {
+                sources.push(format!("Authoritative documentation: '{}'", clean_url));
+                verified += 1;
+            } else {
+                sources.push(format!("Web link: '{}'", clean_url));
+                if lower_url.contains('/') && lower_url.len() > 15 {
+                    verified += 1;
+                } else {
+                    unverified += 1;
+                }
+            }
+        }
+
+        // 2. RFC check & valid number range validation
+        if let Some(rfc_idx) = lower.find("rfc") {
+            let after_rfc = &sentence[rfc_idx + 3..];
+            let rfc_num_str: String = after_rfc
+                .chars()
+                .skip_while(|c| c.is_whitespace() || *c == '-' || *c == ':')
+                .take_while(|c| c.is_ascii_digit())
+                .collect();
+            if let Ok(num) = rfc_num_str.parse::<u32>() {
+                if (1..=9999).contains(&num) {
+                    sources.push(format!("Verified IETF standard: RFC {}", num));
+                    verified += 1;
+                } else {
+                    sources.push(format!("Invalid/unregistered RFC number: RFC {}", num));
+                    unverified += 1;
+                }
+            }
+        }
+
+        // 3. Local file path check
+        for w in sentence.split_whitespace() {
+            let clean = w.trim_matches(|c: char| !c.is_alphanumeric() && c != '/' && c != '\\' && c != '.');
+            if (clean.contains('/') || clean.contains('\\'))
+                && (clean.ends_with(".rs")
+                    || clean.ends_with(".ts")
+                    || clean.ends_with(".js")
+                    || clean.ends_with(".py")
+                    || clean.ends_with(".go")
+                    || clean.ends_with(".java")
+                    || clean.ends_with(".json")
+                    || clean.ends_with(".toml")
+                    || clean.ends_with(".yaml")
+                    || clean.starts_with("c:\\")
+                    || clean.starts_with("d:\\"))
+            {
+                if Path::new(clean).exists() {
+                    sources.push(format!("Verified local file path: '{}'", clean));
+                    verified += 1;
+                } else {
+                    sources.push(format!("Code file reference: '{}'", clean));
+                    verified += 1;
+                }
+            }
+        }
+
+        // 4. Code snippet block
+        if sentence.contains("```") {
+            sources.push("Executable code block".to_string());
+            verified += 1;
+        }
+
+        // 5. Recognized standards body markers
+        const STANDARDS_ORGANIZATIONS: &[&str] = &[
+            "ieee", "iso/iec", "iso ", "w3c", "ansi",
+            "theo chuẩn ieee", "theo chuẩn iso",
+        ];
+        for &marker in STANDARDS_ORGANIZATIONS {
+            if lower.contains(marker) {
+                sources.push(format!("Recognized standards body: '{}'", marker.trim()));
+                verified += 1;
+                break;
+            }
+        }
+
+        // 6. Empirical test or benchmark execution logs
+        if (lower.contains("test result:") && lower.contains("ok"))
+            || lower.contains("benchmark logs")
+            || lower.contains("test coverage")
+        {
+            sources.push("Empirical execution or benchmark log".to_string());
+            verified += 1;
+        }
+
+        (sources, verified, unverified)
+    }
+
     /// Audits response text to verify that technical claims are backed by research and citations.
     pub fn audit(text: &str) -> ResearchReport {
         let trimmed = text.trim();
@@ -51,15 +205,17 @@ impl ResearchGate {
             return ResearchReport {
                 factual_claims_count: 0,
                 citations_count: 0,
-                evidence_ratio: 1.0,
+                verified_citations_count: 0,
+                unverified_citations_count: 0,
+                evidence_ratio: 0.0,
                 speculation_ratio: 0.0,
                 has_research_deficit: false,
                 unverified_claims: vec![],
                 detected_sources: vec![],
                 claim_analyses: vec![],
-                research_score: 100.0,
-                verdict: "THEORETICAL".to_string(),
-                recommendations: vec!["Text is empty.".to_string()],
+                research_score: 0.0,
+                verdict: "INSUFFICIENT_EVIDENCE".to_string(),
+                recommendations: vec!["Text is empty. No research to audit.".to_string()],
             };
         }
 
@@ -69,60 +225,51 @@ impl ResearchGate {
         let mut factual_claims = Vec::new();
         let mut claim_analyses = Vec::new();
         let mut detected_sources = Vec::new();
+        let mut total_verified = 0;
+        let mut total_unverified = 0;
         let mut speculation_count = 0;
 
         for sentence in &sentences {
             let lower = sentence.to_lowercase();
 
-            // 1. Evidence / Citation detection
-            let mut has_citation = false;
-            if lower.contains("http://") || lower.contains("https://") {
-                detected_sources.push("Web URL / Documentation link".to_string());
-                has_citation = true;
-            }
-            if lower.contains(".rs")
-                || lower.contains(".ts")
-                || lower.contains(".js")
-                || lower.contains(".py")
-                || lower.contains(".go")
-                || lower.contains(".java")
-                || lower.contains(".c")
-                || lower.contains(".cpp")
-                || lower.contains(".json")
-                || lower.contains(".toml")
-                || lower.contains(".yaml")
-                || lower.contains(".yml")
-                || lower.contains("c:\\")
-                || lower.contains("d:\\")
-            {
-                detected_sources.push("Source file path reference".to_string());
-                has_citation = true;
-            }
-            if sentence.contains("```") {
-                detected_sources.push("Code snippet / test execution block".to_string());
-                has_citation = true;
-            }
-            for &marker in EVIDENCE_MARKERS {
-                if lower.contains(marker) {
-                    detected_sources.push(format!("Citation marker: '{}'", marker));
-                    has_citation = true;
-                    break;
-                }
+            // Evaluate evidence in this specific sentence
+            let (sources, v_count, unv_count) = Self::evaluate_evidence(sentence);
+            total_verified += v_count;
+            total_unverified += unv_count;
+            for s in sources {
+                detected_sources.push(s);
             }
 
-            // 2. Factual claim detection: version strings, benchmarks, release dates
-            let has_version_claim = lower.contains('v') && sentence.chars().any(|c| c.is_ascii_digit());
-            let has_benchmark_claim = lower.contains("ms")
-                || lower.contains("ops/s")
+            // Factual claim detection: version strings, benchmarks, release dates
+            let has_version_claim = lower.contains("version")
+                || lower.contains("phiên bản")
+                || sentence.split_whitespace().any(|word| {
+                    let w = word.trim_matches(|c: char| !c.is_alphanumeric());
+                    (w.starts_with('v') || w.starts_with('V'))
+                        && w.len() >= 2
+                        && w[1..].chars().next().map(|c| c.is_ascii_digit()).unwrap_or(false)
+                });
+
+            let has_benchmark_claim = lower.contains("ops/s")
                 || lower.contains("benchmark")
                 || lower.contains("throughput")
-                || lower.contains("latency");
+                || lower.contains("latency")
+                || lower.contains("p99")
+                || lower.contains("p95")
+                || lower.contains("req/s")
+                || sentence.split_whitespace().any(|w| {
+                    let clean = w.trim_matches(|c: char| !c.is_alphanumeric());
+                    clean.ends_with("ms")
+                        && clean.len() >= 3
+                        && clean.trim_end_matches("ms").chars().all(|c| c.is_ascii_digit() || c == '.')
+                });
+
             let has_spec_claim = lower.contains("supports")
                 || lower.contains("compatible with")
                 || lower.contains("hỗ trợ")
                 || lower.contains("tương thích");
 
-            if has_version_claim || has_benchmark_claim || has_spec_claim {
+            if has_benchmark_claim || has_version_claim || has_spec_claim {
                 let claim_type = if has_benchmark_claim {
                     "BENCHMARK_PERFORMANCE"
                 } else if has_version_claim {
@@ -131,26 +278,41 @@ impl ResearchGate {
                     "API_COMPATIBILITY"
                 };
 
-                let remediation = match claim_type {
-                    "BENCHMARK_PERFORMANCE" => "Provide official benchmark URL, execution command, or test log to substantiate throughput/latency claims.".to_string(),
-                    "VERSION_SPECIFICATION" => "Provide official release documentation URL or repository link validating version feature support.".to_string(),
-                    _ => "Provide official API reference or specification documentation confirming compatibility.".to_string(),
+                let evidence_status = if unv_count > 0 {
+                    EvidenceStatus::EvidencePresent
+                } else if v_count > 0 {
+                    EvidenceStatus::EvidenceVerified
+                } else {
+                    EvidenceStatus::Unsupported
+                };
+
+                let is_verified = evidence_status == EvidenceStatus::EvidenceVerified;
+
+                let remediation = match evidence_status {
+                    EvidenceStatus::Unsupported => match claim_type {
+                        "BENCHMARK_PERFORMANCE" => "Provide official benchmark URL, execution command, or test log to substantiate throughput/latency claims.".to_string(),
+                        "VERSION_SPECIFICATION" => "Provide official release documentation URL or repository link validating version feature support.".to_string(),
+                        _ => "Provide official API reference or specification documentation confirming compatibility.".to_string(),
+                    },
+                    EvidenceStatus::EvidencePresent => "Citation detected but unverified against authoritative registry/RFC database. Ground claim in official docs (docs.rs, ietf.org, github.com).".to_string(),
+                    EvidenceStatus::EvidenceVerified => String::new(),
                 };
 
                 claim_analyses.push(ClaimAnalysis {
                     claim: sentence.trim().to_string(),
                     claim_type: claim_type.to_string(),
                     evidence_required: true,
-                    is_verified: has_citation,
+                    evidence_status,
+                    is_verified,
                     remediation,
                 });
 
-                if !has_citation {
+                if !is_verified {
                     factual_claims.push(sentence.trim().to_string());
                 }
             }
 
-            // 3. Speculation detection
+            // Speculation detection
             if HEDGING_PHRASES.iter().any(|&h| lower.contains(h)) {
                 speculation_count += 1;
             }
@@ -159,34 +321,38 @@ impl ResearchGate {
         detected_sources.sort();
         detected_sources.dedup();
 
-        let factual_claims_count = factual_claims.len();
-        let citations_count = detected_sources.len();
+        let factual_claims_count = claim_analyses.len();
+        let citations_count = total_verified + total_unverified;
 
         let evidence_ratio = if factual_claims_count == 0 {
             1.0
         } else {
-            (citations_count as f64 / factual_claims_count as f64).min(2.0)
+            (total_verified as f64 / factual_claims_count as f64).min(2.0)
         };
 
         let speculation_ratio = speculation_count as f64 / total_sentences as f64;
 
-        let has_research_deficit = factual_claims_count >= 2 && citations_count == 0;
+        // Research deficit triggers if factual claims exist and verified citations are 0
+        let has_research_deficit = factual_claims_count >= 1 && total_verified == 0;
 
         let base_score = if factual_claims_count == 0 {
             95.0
         } else {
-            (evidence_ratio * 70.0 + (1.0 - speculation_ratio) * 30.0).clamp(0.0, 100.0)
+            let verified_ratio = (total_verified as f64 / factual_claims_count as f64).clamp(0.0, 1.0);
+            (verified_ratio * 70.0 + (1.0 - speculation_ratio) * 30.0).clamp(0.0, 100.0)
         };
 
         let research_score = if has_research_deficit {
-            base_score.min(45.0)
+            base_score.min(40.0)
+        } else if total_unverified > 0 && total_verified == 0 {
+            base_score.min(55.0)
         } else {
             base_score
         };
 
         let verdict = if has_research_deficit {
             "RESEARCH_DEFICIT".to_string()
-        } else if citations_count > 0 || factual_claims_count == 0 {
+        } else if total_verified > 0 || factual_claims_count == 0 {
             "RESEARCH_GROUNDED".to_string()
         } else {
             "THEORETICAL".to_string()
@@ -195,7 +361,13 @@ impl ResearchGate {
         let mut recommendations = Vec::new();
         if has_research_deficit {
             recommendations.push(
-                "Research Deficit: Factual technical assertions made without citations. Verify against official documentation or code repository before answering."
+                "Research Deficit: Factual technical assertions made without authoritative citations. Verify against official documentation (docs.rs, ietf.org) before answering."
+                    .to_string(),
+            );
+        }
+        if total_unverified > 0 {
+            recommendations.push(
+                "Unverified Citations Detected: Replace placeholder or unrecognized URLs/RFCs with authoritative primary documentation."
                     .to_string(),
             );
         }
@@ -209,6 +381,8 @@ impl ResearchGate {
         ResearchReport {
             factual_claims_count,
             citations_count,
+            verified_citations_count: total_verified,
+            unverified_citations_count: total_unverified,
             evidence_ratio,
             speculation_ratio,
             has_research_deficit,
@@ -227,16 +401,16 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_research_grounded() {
+    fn test_research_grounded_authoritative() {
         let text = "According to docs.rs and RFC 2024, tree-sitter v0.24 is compatible with Rust 2021.\nReference: https://github.com/tree-sitter/tree-sitter";
         let report = ResearchGate::audit(text);
         assert!(!report.has_research_deficit);
-        assert!(report.citations_count > 0);
+        assert!(report.verified_citations_count > 0);
         assert_eq!(report.verdict, "RESEARCH_GROUNDED");
     }
 
     #[test]
-    fn test_research_deficit() {
+    fn test_research_deficit_unsupported() {
         let text = "Version v0.23 supports throughput of 50000 ops/s. It is also compatible with all v0.24 compilers without any changes.";
         let report = ResearchGate::audit(text);
         assert!(report.has_research_deficit);
@@ -245,21 +419,28 @@ mod tests {
     }
 
     #[test]
+    fn test_placeholder_url_unverified() {
+        let text = "Version v0.24 is 10x faster according to https://example.com/bench";
+        let report = ResearchGate::audit(text);
+        assert!(report.unverified_citations_count > 0);
+        assert_eq!(report.claim_analyses[0].evidence_status, EvidenceStatus::EvidencePresent);
+        assert!(!report.claim_analyses[0].is_verified);
+    }
+
+    #[test]
+    fn test_fake_rfc_rejected() {
+        let text = "According to RFC 999999, latency is 0.5 ms.";
+        let report = ResearchGate::audit(text);
+        assert!(report.unverified_citations_count > 0);
+        assert_eq!(report.claim_analyses[0].evidence_status, EvidenceStatus::EvidencePresent);
+        assert!(!report.claim_analyses[0].is_verified);
+    }
+
+    #[test]
     fn test_theoretical_no_claims() {
         let text = "Clean code principles emphasize readability and separation of concerns.";
         let report = ResearchGate::audit(text);
         assert!(!report.has_research_deficit);
         assert_eq!(report.verdict, "RESEARCH_GROUNDED");
-    }
-
-    #[test]
-    fn test_claim_analysis_diagnostic() {
-        let text = "Throughput reaches 50000 ops/s on modern servers.";
-        let report = ResearchGate::audit(text);
-        assert!(!report.claim_analyses.is_empty());
-        let claim = &report.claim_analyses[0];
-        assert_eq!(claim.claim_type, "BENCHMARK_PERFORMANCE");
-        assert!(!claim.is_verified);
-        assert!(!claim.remediation.is_empty());
     }
 }

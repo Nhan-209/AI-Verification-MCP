@@ -17,4 +17,4 @@ pub use dag::{DagMetrics, PlanDag, PlanTask, TaskStatus};
 pub use diff_analysis::{ComplexityDelta, ComplexitySnapshot, DiffAnalyzer, DiffReport};
 pub use entropy::{TextEvaluator, TextMetrics};
 pub use foresight::{ForesightEngine, ForesightReport};
-pub use research_gate::{ResearchGate, ResearchReport};
+pub use research_gate::{EvidenceStatus, ResearchGate, ResearchReport};
