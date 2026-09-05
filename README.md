@@ -1,4 +1,4 @@
-# 🛡️ MCP Plugin Math: AI Agent Verification & Governance Layer
+# 🛡️ AI Verification MCP: AI Agent Verification & Governance Layer
 
 [English](README.md) | [Tiếng Việt](README_VI.md)
 
@@ -7,27 +7,28 @@
 [![Protocol: MCP 2024-11-05](https://img.shields.io/badge/MCP-2024--11--05-brightgreen.svg)](https://modelcontextprotocol.io)
 [![Version: 0.5.0](https://img.shields.io/badge/version-0.5.0-orange.svg)](Cargo.toml)
 
-An ultra-high-performance **Model Context Protocol (MCP)** Server written in **Rust** that serves as an **AI Agent Verification & Governance Layer**. It evaluates proposed AI actions, plans, diffs, and draft responses against deterministic mathematical metrics and static analysis, enforcing 3-tier governance decisions (**`ALLOW`**, **`WARN`**, **`BLOCK`**) with machine-readable violation codes and actionable remediation advice.
+An ultra-high-performance **Model Context Protocol (MCP)** Server written in **Rust** that serves as an **AI Agent Verification & Governance Layer**. It evaluates proposed AI actions, plans, diffs, and draft responses against deterministic signals and static analysis, enforcing 3-tier governance decisions (**`ALLOW`**, **`WARN`**, **`BLOCK`**) with machine-readable violation codes and actionable remediation advice.
 
 ---
 
-## 🌟 The Philosophy: Deterministic Verification & Guardrails
+## 🌟 The Philosophy: Deterministic Signals Constrain & Audit Agent Behavior
 
-Large Language Models (LLMs) are inherently probabilistic token predictors. In autonomous multi-agent environments, unconstrained agents can introduce:
-1. **Hallucination & Drift**: Fabricating APIs or drifting away from original user intent.
-2. **Scope Creep ($W > 0$)**: Executing unapproved, disruptive tasks without justification.
-3. **Fluff & Token Inefficiency**: Low information density, conversational filler, or redundant output.
+Large Language Models (LLMs) are inherently probabilistic token predictors. While an LLM cannot mathematically guarantee the absence of semantic hallucinations, an independent deterministic verification layer **can** audit and constrain agent reasoning artifacts before execution or user delivery:
+
+1. **Hallucination & Drift**: Fabricating ungrounded APIs or drifting away from original user intent.
+2. **Scope Creep ($W > 0$)**: Executing unapproved, disruptive tasks without plan justification.
+3. **Fluff & Token Inefficiency**: Low information density, conversational filler, or redundant token waste.
 4. **Epistemic Overconfidence**: Making absolute claims ("guaranteed", "100%") without empirical verification.
 5. **Research Deficit**: Guessing library versions or specifications instead of grounding in RFCs and docs.
 6. **Lazy Planning**: Shallow single-step plans for complex multi-requirement tasks, omitting edge cases.
 
-`mcp-plugin-math` provides a deterministic **Verification & Governance Gate**. Before executing high-impact actions or sending final responses, agents submit their plan and drafts to the governance layer to receive structured feedback:
+`ai-verification-mcp` provides a deterministic **Verification & Governance Gate**. Before executing high-impact actions or sending final responses, agents submit their plan, diffs, and drafts to receive structured feedback:
 
 ```
-[Agent Proposal] ──► [mcp-plugin-math Governance Gate] ──► ALLOW | WARN | BLOCK
-                                                               ▲
-                                                    Structured Violations
-                                                    & Actionable Remediation
+[Agent Proposal] ──► [ai-verification-mcp Governance Gate] ──► ALLOW | WARN | BLOCK
+                                                                  ▲
+                                                       Structured Violations
+                                                       & Actionable Remediation
 ```
 
 ---
@@ -75,7 +76,7 @@ Execution plans are modeled as a DAG $G = (V, E)$.
 
 ## 🚦 Governance Decision Model: 3-Tier Policy
 
-The unified governance gate (`math_audit_cognition`) evaluates all active pillars and outputs a structured 3-tier decision:
+The unified governance gate (`verify_agent`) evaluates all active pillars and outputs a structured 3-tier decision:
 
 | Decision | Criteria | Agent Behavior |
 |:---:|---|---|
@@ -116,25 +117,27 @@ The unified audit supports three execution modes:
 
 ---
 
-## 🛠️ MCP Tools Exposed (9 Tools)
+## 🛠️ MCP Tools Exposed (Primary & Legacy Aliases)
 
-| Tool Name | Type | Description |
-|---|---|---|
-| **`math_audit_cognition`** | **Unified Gate** | 6-Pillar verification engine. Returns 3-tier decision (`ALLOW`/`WARN`/`BLOCK`), structured violations, and remediation plan. Supports `quick`, `standard`, `deep` modes. |
-| **`math_track_dag`** | Granular | Tracks execution on Directed Acyclic Graphs. Detects cycles, dependency errors, and isolates justified exploratory steps. |
-| **`math_eval_code`** | Granular | Computes Tree-sitter AST, McCabe Cyclomatic Complexity, Halstead measures, Maintainability Index, and boundary warnings across 7 languages. |
-| **`math_eval_diff`** | Granular | Analyzes diffs via LCS, calculating change ratio, complexity deltas ($\Delta M$, $\Delta\text{MI}$), touched functions, and regression risk. |
-| **`math_eval_text`** | Granular | Analyzes Shannon entropy, information density, compression ratio, Flesch readability, and conversational padding. |
-| **`math_confidence`** | Granular | Epistemic calibration gate. Detects ungrounded overconfidence while whitelisting empirical metrics and specification contracts. |
-| **`math_audit_research`** | Granular | Analyzes technical claims (benchmarks, versions, APIs), verifies evidence (RFCs, URLs, test logs), and flags research deficits. |
-| **`math_eval_foresight`** | Granular | Evaluates defensive error handling, edge cases, verification strategy, and flags lazy plans. |
-| **`math_verify_constraints`** | Granular | Evaluates requirement fulfillment using n-gram Jaccard matching and dynamic negation contradiction analysis. |
+All tools feature 100% backward-compatible aliases for legacy `math_*` clients.
+
+| Primary Tool Name | Legacy Alias | Type | Description |
+|---|---|---|---|
+| **`verify_agent`** | `math_audit_cognition`, `ai_audit_cognition` | **Unified Gate** | 6-Pillar verification engine. Returns 3-tier decision (`ALLOW`/`WARN`/`BLOCK`), structured violations, and remediation plan. Supports `quick`, `standard`, `deep` modes. |
+| **`verify_dag`** | `math_track_dag` | Diagnostic | Tracks execution on Directed Acyclic Graphs. Detects cycles, dependency errors, and isolates justified exploratory steps. |
+| **`verify_code`** | `math_eval_code` | Diagnostic | Computes Tree-sitter AST, McCabe Cyclomatic Complexity, Halstead measures, Maintainability Index, and boundary warnings across 7 languages. |
+| **`verify_diff`** | `math_eval_diff` | Diagnostic | Analyzes diffs via LCS, calculating change ratio, complexity deltas ($\Delta M$, $\Delta\text{MI}$), touched functions, and regression risk. |
+| **`verify_text`** | `math_eval_text` | Diagnostic | Analyzes Shannon entropy, information density, compression ratio, Flesch readability, and conversational padding. |
+| **`verify_confidence`** | `math_confidence` | Diagnostic | Epistemic calibration gate. Detects ungrounded overconfidence while whitelisting empirical metrics and specification contracts. |
+| **`verify_research`** | `math_audit_research` | Diagnostic | Analyzes technical claims (benchmarks, versions, APIs), verifies evidence (RFCs, URLs, test logs), and flags research deficits. |
+| **`verify_foresight`** | `math_eval_foresight` | Diagnostic | Evaluates defensive error handling, edge cases, verification strategy, and flags lazy plans. |
+| **`verify_constraints`** | `math_verify_constraints` | Diagnostic | Evaluates requirement fulfillment using n-gram Jaccard matching and dynamic negation contradiction analysis. |
 
 ---
 
 ## 📦 Language Support & Feature Flags
 
-`mcp-plugin-math` uses Cargo feature flags for modular compilation:
+`ai-verification-mcp` uses Cargo feature flags for modular compilation:
 
 | Feature Flag | Languages Supported | Default? |
 |---|---|:---:|
@@ -151,7 +154,7 @@ The unified audit supports three execution modes:
 
 ## 🚀 Installation & Integration
 
-Pre-compiled standalone binaries for **Linux (x86_64)** and **Windows (x86_64)** are built on every release and commit via [GitHub Actions](https://github.com/Nhan-209/mcp-plugin-math/actions).
+Pre-compiled standalone binaries for **Linux (x86_64)** and **Windows (x86_64)** are built on every release and commit via [GitHub Actions](https://github.com/Nhan-209/mcp-plugin-math/actions). Both `ai-verification-mcp` and `mcp-plugin-math` binaries are produced identically.
 
 ### Configuration in MCP Clients
 
@@ -160,8 +163,8 @@ Add to your `claude_desktop_config.json`, Antigravity, or Gemini CLI configurati
 ```json
 {
   "mcpServers": {
-    "math-verifier": {
-      "command": "/path/to/mcp-plugin-math",
+    "ai-verification-mcp": {
+      "command": "/path/to/ai-verification-mcp",
       "args": []
     }
   }
@@ -172,8 +175,8 @@ Or on Windows:
 ```json
 {
   "mcpServers": {
-    "math-verifier": {
-      "command": "C:\\path\\to\\mcp-plugin-math.exe",
+    "ai-verification-mcp": {
+      "command": "C:\\path\\to\\ai-verification-mcp.exe",
       "args": []
     }
   }

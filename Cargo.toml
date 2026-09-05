@@ -1,12 +1,20 @@
 [package]
-name = "mcp-plugin-math"
+name = "ai-verification-mcp"
 version = "0.5.0"
 edition = "2021"
 authors = ["Nhan-209"]
-description = "High-performance Rust MCP Server for AI Agent Verification & Governance Layer"
+description = "High-performance Rust MCP Server for AI Agent Verification, Governance & Behavioral Auditing"
 license = "MIT"
 readme = "README.md"
 repository = "https://github.com/Nhan-209/mcp-plugin-math"
+
+[[bin]]
+name = "ai-verification-mcp"
+path = "src/main.rs"
+
+[[bin]]
+name = "mcp-plugin-math"
+path = "src/main.rs"
 
 [features]
 default = ["lang-rust", "lang-typescript", "lang-python"]

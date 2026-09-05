@@ -29,8 +29,8 @@ use serde_json::json;
 pub fn get_available_tools() -> Vec<Tool> {
     vec![
         Tool {
-            name: "math_audit_cognition".to_string(),
-            description: "Unified AI Governance & Metacognition Gate. Evaluates decisions as ALLOW, WARN, or BLOCK across 6 verification pillars: constraints, plan DAG, text density, epistemic calibration, empirical research, and proactive foresight.".to_string(),
+            name: "verify_agent".to_string(),
+            description: "Unified AI Agent Governance & Behavioral Verification Gate (formerly math_audit_cognition). Evaluates decisions as ALLOW, WARN, or BLOCK across 6 verification pillars: constraints, plan DAG, text density, epistemic calibration, empirical research, and proactive foresight.".to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {
@@ -79,8 +79,8 @@ pub fn get_available_tools() -> Vec<Tool> {
             }),
         },
         Tool {
-            name: "math_track_dag".to_string(),
-            description: "Tracks plan execution against a Directed Acyclic Graph (DAG). Detects topological violations, cycles, plan coverage ratio C, and scope creep W.".to_string(),
+            name: "verify_dag".to_string(),
+            description: "Tracks plan execution against a Directed Acyclic Graph (DAG) (formerly math_track_dag). Detects topological violations, cycles, plan coverage ratio C, and scope creep W.".to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {
@@ -105,8 +105,8 @@ pub fn get_available_tools() -> Vec<Tool> {
             }),
         },
         Tool {
-            name: "math_eval_code".to_string(),
-            description: "Analyzes code using Tree-sitter AST, McCabe Cyclomatic Complexity, Halstead Metrics, Maintainability Index, and boundary checks.".to_string(),
+            name: "verify_code".to_string(),
+            description: "Analyzes code using Tree-sitter AST, McCabe Cyclomatic Complexity, Halstead Metrics, Maintainability Index, and boundary checks (formerly math_eval_code).".to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {
@@ -117,8 +117,8 @@ pub fn get_available_tools() -> Vec<Tool> {
             }),
         },
         Tool {
-            name: "math_eval_diff".to_string(),
-            description: "Analyzes code diffs using Longest Common Subsequence (LCS), measuring change ratio, cyclomatic and maintainability deltas, functions affected, and regression risk.".to_string(),
+            name: "verify_diff".to_string(),
+            description: "Analyzes code diffs using Longest Common Subsequence (LCS) (formerly math_eval_diff), measuring change ratio, cyclomatic and maintainability deltas, functions affected, and regression risk.".to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {
@@ -130,8 +130,8 @@ pub fn get_available_tools() -> Vec<Tool> {
             }),
         },
         Tool {
-            name: "math_eval_text".to_string(),
-            description: "Evaluates text through Information Theory (Shannon Entropy, Information Density), Kolmogorov compression estimation, readability (Flesch-Kincaid, Gunning Fog), and AI filler detection.".to_string(),
+            name: "verify_text".to_string(),
+            description: "Evaluates text through Information Theory (Shannon Entropy, Information Density) (formerly math_eval_text), Kolmogorov compression estimation, readability (Flesch-Kincaid, Gunning Fog), and AI filler detection.".to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {
@@ -141,8 +141,8 @@ pub fn get_available_tools() -> Vec<Tool> {
             }),
         },
         Tool {
-            name: "math_confidence".to_string(),
-            description: "Epistemic Calibration Gate. Evaluates draft text for overconfidence, unverified certainty claims, hedging ratio, assertion density, and self-contradictions.".to_string(),
+            name: "verify_confidence".to_string(),
+            description: "Epistemic Calibration Gate (formerly math_confidence). Evaluates draft text for overconfidence, unverified certainty claims, hedging ratio, assertion density, and self-contradictions.".to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {
@@ -152,8 +152,8 @@ pub fn get_available_tools() -> Vec<Tool> {
             }),
         },
         Tool {
-            name: "math_audit_research".to_string(),
-            description: "Forces research and factual grounding. Scans text for technical claims, checks for empirical citations (URLs, RFCs, paths, logs), and flags research deficits.".to_string(),
+            name: "verify_research".to_string(),
+            description: "Forces research and factual grounding (formerly math_audit_research). Scans text for technical claims, checks for empirical citations (URLs, RFCs, paths, logs), and flags research deficits.".to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {
@@ -163,8 +163,8 @@ pub fn get_available_tools() -> Vec<Tool> {
             }),
         },
         Tool {
-            name: "math_eval_foresight".to_string(),
-            description: "Evaluates proactive foresight: defensive error handling, boundary/edge case coverage, verification strategy, and flags lazy shallow plans.".to_string(),
+            name: "verify_foresight".to_string(),
+            description: "Evaluates proactive foresight (formerly math_eval_foresight): defensive error handling, boundary/edge case coverage, verification strategy, and flags lazy shallow plans.".to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {
@@ -176,8 +176,8 @@ pub fn get_available_tools() -> Vec<Tool> {
             }),
         },
         Tool {
-            name: "math_verify_constraints".to_string(),
-            description: "Formal Set Theory constraint verification with n-gram Jaccard semantic matching and dynamic negation pattern contradiction detection.".to_string(),
+            name: "verify_constraints".to_string(),
+            description: "Formal Set Theory constraint verification with n-gram Jaccard semantic matching and dynamic negation pattern contradiction detection (formerly math_verify_constraints).".to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {

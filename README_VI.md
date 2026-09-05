@@ -1,4 +1,4 @@
-# 🛡️ MCP Plugin Math: Tầng Quản Trị & Kiểm Toán Nhận Thức Cho AI Agent
+# 🛡️ AI Verification MCP: Tầng Quản Trị & Kiểm Toán Tác Tử AI Tất Định
 
 [English](README.md) | [Tiếng Việt](README_VI.md)
 
@@ -7,27 +7,28 @@
 [![Protocol: MCP 2024-11-05](https://img.shields.io/badge/MCP-2024--11--05-brightgreen.svg)](https://modelcontextprotocol.io)
 [![Version: 0.5.0](https://img.shields.io/badge/version-0.5.0-orange.svg)](Cargo.toml)
 
-Một **Model Context Protocol (MCP)** Server hiệu năng cực cao viết bằng **Rust**, đóng vai trò là **Tầng Quản Trị & Kiểm Toán (Verification & Governance Layer)** cho các hệ thống AI Agent. Dự án chuyển hóa các chỉ số toán học và phân tích tĩnh thành các rào chắn kỹ thuật (guardrails), áp dụng cơ chế phán quyết 3 cấp (**`ALLOW`**, **`WARN`**, **`BLOCK`**) với mã vi phạm chuẩn hóa và kế hoạch khắc phục hành động cụ thể (actionable remediation).
+Một **Model Context Protocol (MCP)** Server hiệu năng cực cao viết bằng **Rust**, đóng vai trò là **Tầng Quản Trị & Kiểm Toán (Verification & Governance Layer)** cho các hệ thống AI Agent. Dự án chuyển hóa các tín hiệu tất định và phân tích tĩnh thành các rào chắn kỹ thuật (guardrails), áp dụng cơ chế phán quyết 3 cấp (**`ALLOW`**, **`WARN`**, **`BLOCK`**) với mã vi phạm chuẩn hóa và kế hoạch khắc phục hành động cụ thể (actionable remediation).
 
 ---
 
-## 🌟 Triết Lý: Rào Chắn Kỹ Thuật Tất Định Thay Vì Phỏng Đoán
+## 🌟 Triết Lý: Rào Chắn Tín Hiệu Tất Định Kiểm Soát & Giám Sát Tác Tử AI
 
-Các Mô hình Ngôn ngữ Lớn (LLM) bản chất là các bộ dự đoán token theo xác suất. Trong các luồng tương tác đa tác tử (multi-agent workflows), việc thiếu sự kiểm soát tất định dẫn tới:
-1. **Ảo giác & Lệch mục tiêu (Hallucination & Drift)**: Bịa đặt API hoặc tự ý đi xa khỏi yêu cầu người dùng.
+Các Mô hình Ngôn ngữ Lớn (LLM) bản chất là các bộ dự đoán token theo xác suất. Dù LLM không thể chứng minh toán học rằng mình không có ảo giác ngữ nghĩa, một tầng kiểm toán tất định độc lập **hoàn toàn có thể** kiểm soát và ràng buộc các sản phẩm suy luận của agent (kế hoạch, mã diff, dẫn chứng thực nghiệm, mức độ tự tin):
+
+1. **Ảo giác & Lệch mục tiêu (Hallucination & Drift)**: Bịa đặt API không căn cứ hoặc tự ý đi xa khỏi yêu cầu người dùng.
 2. **Làm thừa việc không kiểm soát ($W > 0$)**: Tự ý code hoặc thực thi tác vụ ngoài kế hoạch gây phá vỡ kiến trúc.
-3. **Dài dòng & Hao tổn Token**: Mật độ thông tin nghèo nàn, nhiều từ đệm khách sáo, nội dung lặp lại.
+3. **Dài dòng & Hao tổn Token**: Mật độ thông tin nghèo nàn, nhiều từ đệm khách sáo, lãng phí token vô ích.
 4. **Tự tin thái quá (Overconfidence)**: Tuyên bố "chắc chắn 100%", "hoàn hảo không lỗi" khi không hề có dữ liệu thực nghiệm.
 5. **Lười nghiên cứu (Research Deficit)**: Đoán mò tính năng thư viện, thông số API thay vì viện dẫn RFC và tài liệu.
 6. **Lập kế hoạch hời hợt (Lazy Plan)**: Lập kế hoạch 1 bước sơ sài cho bài toán phức tạp, bỏ quên ca biên và xử lý lỗi.
 
-`mcp-plugin-math` cung cấp một **Cổng Quản Trị & Kiểm Toán (Governance Gate)** độc lập. Trước khi thực thi hành động quan trọng hoặc gửi câu trả lời hoàn tất, AI gửi kế hoạch và bản nháp tới cổng kiểm toán để nhận phản hồi cấu trúc:
+`ai-verification-mcp` cung cấp một **Cổng Quản Trị & Kiểm Toán (Governance Gate)** độc lập. Trước khi thực thi hành động quan trọng hoặc gửi câu trả lời hoàn tất, AI gửi kế hoạch, mã diff và bản nháp tới cổng kiểm toán để nhận phản hồi cấu trúc:
 
 ```
-[Đề Xuất Của AI] ──► [Cổng Kiểm Toán mcp-plugin-math] ──► ALLOW | WARN | BLOCK
-                                                               ▲
-                                                    Mã Vi Phạm & Kế Hoạch
-                                                    Khắc Phục Cụ Thể
+[Đề Xuất Của AI] ──► [Cổng Kiểm Toán ai-verification-mcp] ──► ALLOW | WARN | BLOCK
+                                                                  ▲
+                                                       Mã Vi Phạm & Kế Hoạch
+                                                       Khắc Phục Cụ Thể
 ```
 
 ---
@@ -75,7 +76,7 @@ Kế hoạch thực thi được mô hình hóa thành Đồ thị Có hướng 
 
 ## 🚦 Cơ Chế Phán Quyết 3 Cấp: ALLOW, WARN, BLOCK
 
-Cổng kiểm toán tổng hợp (`math_audit_cognition`) đưa ra quyết định quản trị rõ ràng:
+Cổng kiểm toán tổng hợp (`verify_agent`) đưa ra quyết định quản trị rõ ràng:
 
 | Quyết Định | Điều Kiện | Hành Vi Của Agent |
 |:---:|---|---|
@@ -115,23 +116,27 @@ Cổng kiểm toán tổng hợp (`math_audit_cognition`) đưa ra quyết đị
 
 ---
 
-## 🛠️ Danh Sách 9 MCP Tools
+## 🛠️ Danh Sách MCP Tools (Tên Mới & Bí Danh Tương Thích)
 
-| Tool Name | Loại | Mô Tả |
-|---|---|---|
-| **`math_audit_cognition`** | **Cổng Tổng Hợp** | Kiểm toán toàn diện 6 trụ cột. Trả về phán quyết 3 cấp (`ALLOW`/`WARN`/`BLOCK`), danh sách vi phạm và kế hoạch khắc phục. Hỗ trợ 3 chế độ `quick`, `standard`, `deep`. |
-| **`math_track_dag`** | Chi Tiết | Theo dõi tiến trình DAG. Bắt lỗi chu trình, sai thứ tự tô pô và hỗ trợ phân loại khám phá hợp lệ. |
-| **`math_eval_code`** | Chi Tiết | Phân tích AST qua Tree-sitter, McCabe Cyclomatic, Halstead, Maintainability Index và cảnh báo biên cho 7 ngôn ngữ. |
-| **`math_eval_diff`** | Chi Tiết | Phân tích diff bằng LCS, tính toán tỷ lệ thay đổi, biến thiên độ phức tạp ($\Delta M$, $\Delta\text{MI}$), hàm bị ảnh hưởng và rủi ro hồi quy. |
-| **`math_eval_text`** | Chi Tiết | Đo lường Shannon entropy, mật độ thông tin, tỷ lệ nén, chỉ số khả năng đọc và phát hiện từ đệm AI. |
-| **`math_confidence`** | Chi Tiết | Hiệu chuẩn nhận thức. Bắt lỗi tự tin thái quá đồng thời công nhận các khẳng định chỉ số thực nghiệm và hợp đồng đặc tả. |
-| **`math_audit_research`** | Chi Tiết | Rà soát khẳng định kỹ thuật (benchmark, phiên bản, API), kiểm tra dẫn chứng (RFC, URL, log) và cảnh báo thiếu hụt nghiên cứu. |
-| **`math_eval_foresight`** | Chi Tiết | Đánh giá thiết kế phòng thủ, ca biên, chiến lược kiểm thử và cảnh báo kế hoạch sơ sài. |
-| **`math_verify_constraints`** | Chi Tiết | Đối soát yêu cầu với giải pháp thực tế bằng n-gram Jaccard và phát hiện mâu thuẫn phủ định động. |
+Toàn bộ công cụ hỗ trợ 100% bí danh ngược (backward-compatible) cho các client đang dùng tên `math_*`.
+
+| Tên Công Cụ Chính | Bí Danh Kế Thừa | Loại | Mô Tả |
+|---|---|---|---|
+| **`verify_agent`** | `math_audit_cognition`, `ai_audit_cognition` | **Cổng Tổng Hợp** | Kiểm toán toàn diện 6 trụ cột. Trả về phán quyết 3 cấp (`ALLOW`/`WARN`/`BLOCK`), danh sách vi phạm và kế hoạch khắc phục. Hỗ trợ 3 chế độ `quick`, `standard`, `deep`. |
+| **`verify_dag`** | `math_track_dag` | Chẩn Đoán | Theo dõi tiến trình DAG. Bắt lỗi chu trình, sai thứ tự tô pô và hỗ trợ phân loại khám phá hợp lệ. |
+| **`verify_code`** | `math_eval_code` | Chẩn Đoán | Phân tích AST qua Tree-sitter, McCabe Cyclomatic, Halstead, Maintainability Index và cảnh báo biên cho 7 ngôn ngữ. |
+| **`verify_diff`** | `math_eval_diff` | Chẩn Đoán | Phân tích diff bằng LCS, tính toán tỷ lệ thay đổi, biến thiên độ phức tạp ($\Delta M$, $\Delta\text{MI}$), hàm bị ảnh hưởng và rủi ro hồi quy. |
+| **`verify_text`** | `math_eval_text` | Chẩn Đoán | Đo lường Shannon entropy, mật độ thông tin, tỷ lệ nén, chỉ số khả năng đọc và phát hiện từ đệm AI. |
+| **`verify_confidence`** | `math_confidence` | Chẩn Đoán | Hiệu chuẩn nhận thức. Bắt lỗi tự tin thái quá đồng thời công nhận các khẳng định chỉ số thực nghiệm và hợp đồng đặc tả. |
+| **`verify_research`** | `math_audit_research` | Chẩn Đoán | Rà soát khẳng định kỹ thuật (benchmark, phiên bản, API), kiểm tra dẫn chứng (RFC, URL, log) và cảnh báo thiếu hụt nghiên cứu. |
+| **`verify_foresight`** | `math_eval_foresight` | Chẩn Đoán | Đánh giá thiết kế phòng thủ, ca biên, chiến lược kiểm thử và cảnh báo kế hoạch sơ sài. |
+| **`verify_constraints`** | `math_verify_constraints` | Chẩn Đoán | Đối soát yêu cầu với giải pháp thực tế bằng n-gram Jaccard và phát hiện mâu thuẫn phủ định động. |
 
 ---
 
 ## 📦 Hỗ Trợ Ngôn Ngữ & Feature Flags
+
+`ai-verification-mcp` sử dụng Cargo feature flags để biên dịch theo module:
 
 | Feature Flag | Ngôn Ngữ Hỗ Trợ | Mặc Định? |
 |---|---|:---:|
@@ -148,7 +153,7 @@ Cổng kiểm toán tổng hợp (`math_audit_cognition`) đưa ra quyết đị
 
 ## 🚀 Cài Đặt & Tích Hợp
 
-File binary độc lập cho **Linux (x86_64)** và **Windows (x86_64)** được tự động biên dịch trên mỗi commit/release qua [GitHub Actions](https://github.com/Nhan-209/mcp-plugin-math/actions).
+File binary độc lập cho **Linux (x86_64)** và **Windows (x86_64)** được tự động biên dịch trên mỗi commit/release qua [GitHub Actions](https://github.com/Nhan-209/mcp-plugin-math/actions). Cả hai file thực thi `ai-verification-mcp` và `mcp-plugin-math` đều được xuất xưởng giống hệt nhau.
 
 ### Cấu Hình MCP Clients
 
@@ -157,8 +162,8 @@ Thêm vào tệp cấu hình của Claude Desktop, Antigravity, hoặc Gemini CL
 ```json
 {
   "mcpServers": {
-    "math-verifier": {
-      "command": "/path/to/mcp-plugin-math",
+    "ai-verification-mcp": {
+      "command": "/path/to/ai-verification-mcp",
       "args": []
     }
   }
@@ -169,8 +174,8 @@ Hoặc trên Windows:
 ```json
 {
   "mcpServers": {
-    "math-verifier": {
-      "command": "C:\\path\\to\\mcp-plugin-math.exe",
+    "ai-verification-mcp": {
+      "command": "C:\\path\\to\\ai-verification-mcp.exe",
       "args": []
     }
   }

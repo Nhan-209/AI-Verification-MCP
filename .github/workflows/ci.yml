@@ -51,8 +51,10 @@ jobs:
       - name: Upload Binary Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: mcp-plugin-math-${{ matrix.os }}
+          name: ai-verification-mcp-${{ matrix.os }}
           path: |
+            target/release/ai-verification-mcp
+            target/release/ai-verification-mcp.exe
             target/release/mcp-plugin-math
             target/release/mcp-plugin-math.exe
           if-no-files-found: ignore

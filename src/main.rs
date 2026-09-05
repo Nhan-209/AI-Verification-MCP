@@ -1,4 +1,4 @@
-use mcp_plugin_math::mcp;
+use ai_verification_mcp::mcp;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 
 #[tokio::main]
