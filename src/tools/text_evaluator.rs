@@ -14,3 +14,24 @@ pub fn execute_text_evaluator(args: Value) -> Result<Value, String> {
     let metrics = TextEvaluator::evaluate(&input.text);
     Ok(json!(metrics))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_execute_text_evaluator_valid() {
+        let args = json!({ "text": "Quick brown fox jumps over the lazy dog." });
+        let res = execute_text_evaluator(args);
+        assert!(res.is_ok());
+        let val = res.unwrap();
+        assert!(val.get("shannon_entropy_bits").is_some());
+    }
+
+    #[test]
+    fn test_execute_text_evaluator_invalid() {
+        let args = json!({ "wrong": 123 });
+        let res = execute_text_evaluator(args);
+        assert!(res.is_err());
+    }
+}

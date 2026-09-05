@@ -53,12 +53,15 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
 
     // 1. Constraint Verification (Weight: 0.30)
     let constraint_report = if !input.user_requirements.is_empty() {
-        let impl_claims: Vec<String> = input
-            .executed_steps
-            .clone()
-            .into_iter()
-            .chain(input.draft_response.clone())
-            .collect();
+        let mut impl_claims: Vec<String> = input.executed_steps.clone();
+        for task in &input.planned_tasks {
+            if input.executed_steps.contains(&task.id) {
+                impl_claims.push(task.name.clone());
+            }
+        }
+        if let Some(ref text) = input.draft_response {
+            impl_claims.push(text.clone());
+        }
         let rep = ConstraintEngine::verify(&input.user_requirements, &impl_claims);
 
         if !rep.missing_requirements.is_empty() {
@@ -186,7 +189,10 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
     };
 
     // 5. Foresight & Diligence Evaluation (Weight: 0.10)
-    let foresight_report = {
+    let foresight_report = if input.draft_response.is_some()
+        || input.code_snippet.is_some()
+        || !input.planned_tasks.is_empty()
+    {
         let f_rep = ForesightEngine::evaluate(
             input.draft_response.as_deref(),
             input.code_snippet.as_deref(),
@@ -208,6 +214,8 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
             weight: 0.10,
         });
         Some(f_rep)
+    } else {
+        None
     };
 
     // 6. Code Metrics Evaluation (Weight: 0.20)
@@ -284,4 +292,65 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
     };
 
     serde_json::to_value(report).map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_unified_audit_empty_input() {
+        let args = json!({});
+        let result = execute_unified_audit(args);
+        assert!(result.is_ok());
+        let val = result.unwrap();
+        assert_eq!(val["verdict"], "PASS");
+        assert_eq!(val["composite_score"], 100.0);
+    }
+
+    #[test]
+    fn test_unified_audit_full_happy_path() {
+        let args = json!({
+            "user_requirements": ["implement helper", "add tests"],
+            "planned_tasks": [
+                {"id": "t1", "name": "implement helper", "dependencies": []},
+                {"id": "t2", "name": "add tests", "dependencies": ["t1"]}
+            ],
+            "executed_steps": ["t1", "t2"],
+            "draft_response": "According to docs.rs and RFC 1234, the helper is implemented in helper.rs with assertions, fallback retry, and unit test coverage. See: https://docs.rs/example",
+            "code_snippet": "fn helper() -> Result<bool, String> { Ok(true) }",
+            "language": "rust"
+        });
+        let result = execute_unified_audit(args);
+        assert!(result.is_ok());
+        let val = result.unwrap();
+        assert_eq!(val["verdict"], "PASS");
+        assert!(val["composite_score"].as_f64().unwrap() > 70.0);
+        assert!(val["critical_violations"].as_array().unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_unified_audit_critical_violations() {
+        let args = json!({
+            "user_requirements": ["implement helper", "secure auth", "database migration"],
+            "planned_tasks": [
+                {"id": "t1", "name": "implement helper", "dependencies": []}
+            ],
+            "executed_steps": ["t1"],
+            "draft_response": "This is guaranteed 100% flawless and will never fail.",
+        });
+        let result = execute_unified_audit(args);
+        assert!(result.is_ok());
+        let val = result.unwrap();
+        assert_eq!(val["verdict"], "FAIL");
+        let violations = val["critical_violations"].as_array().unwrap();
+        assert!(!violations.is_empty());
+    }
+
+    #[test]
+    fn test_unified_audit_invalid_json() {
+        let args = json!("not an object");
+        let result = execute_unified_audit(args);
+        assert!(result.is_err());
+    }
 }

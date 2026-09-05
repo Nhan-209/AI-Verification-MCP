@@ -55,9 +55,11 @@ impl ConstraintEngine {
         }
 
         // Mutual exclusivity / Contradiction checks (P and not P)
-        let mut all_items = Vec::new();
-        all_items.extend_from_slice(requirements);
-        all_items.extend_from_slice(implementations);
+        let all_items: Vec<&str> = requirements
+            .iter()
+            .chain(implementations.iter())
+            .map(|s| s.as_str())
+            .collect();
         let contradictions = Self::detect_contradictions(&all_items);
 
         let total_requirements = req_set.len();
@@ -91,6 +93,8 @@ impl ConstraintEngine {
         let stop_words = [
             "must", "be", "in", "the", "a", "an", "for", "to", "of", "with", "and", "by", "all",
             "is", "use", "using",
+            // Vietnamese stop words
+            "và", "là", "của", "trong", "cho", "với", "để", "các", "những", "phải", "được", "có",
         ];
         let key_words_req: Vec<&str> = req
             .split_whitespace()
@@ -145,7 +149,7 @@ impl ConstraintEngine {
         intersection as f64 / min_len as f64
     }
 
-    fn detect_contradictions(items: &[String]) -> Vec<String> {
+    fn detect_contradictions(items: &[&str]) -> Vec<String> {
         let mut contradictions = Vec::new();
         let joined = items.join(" ").to_lowercase();
 
@@ -157,6 +161,10 @@ impl ConstraintEngine {
             ("public repo", "private repo"),
             ("pure rust", "node c++ addon"),
             ("zero dependencies", "use petgraph"),
+            // Vietnamese contradiction pairs
+            ("không build local", "cargo build"),
+            ("không test local", "cargo test"),
+            ("không chạy local", "cargo build"),
         ];
 
         for (a, b) in contradiction_pairs {
@@ -180,6 +188,10 @@ impl ConstraintEngine {
             "do not ",
             "cannot ",
             "shouldn't ",
+            "không ",
+            "chưa ",
+            "đừng ",
+            "tuyệt đối không ",
         ];
 
         for item in items {
@@ -271,6 +283,25 @@ mod tests {
     fn test_dynamic_contradiction() {
         let reqs = vec!["Rule: without external api calls".to_string()];
         let impls = vec!["Implemented by calling external api calls directly".to_string()];
+
+        let report = ConstraintEngine::verify(&reqs, &impls);
+        assert!(!report.contradictions.is_empty());
+    }
+
+    #[test]
+    fn test_vietnamese_semantic_matching() {
+        let reqs = vec!["phải sử dụng ngôn ngữ rust".to_string()];
+        let impls = vec!["đã sử dụng ngôn ngữ rust trong toàn bộ dự án".to_string()];
+
+        let report = ConstraintEngine::verify(&reqs, &impls);
+        assert_eq!(report.satisfied_requirements, 1);
+        assert!(report.is_aligned);
+    }
+
+    #[test]
+    fn test_vietnamese_contradiction() {
+        let reqs = vec!["Quy tắc: tuyệt đối không build local".to_string()];
+        let impls = vec!["Đang chạy cargo build trên máy local".to_string()];
 
         let report = ConstraintEngine::verify(&reqs, &impls);
         assert!(!report.contradictions.is_empty());

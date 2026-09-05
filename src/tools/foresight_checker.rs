@@ -23,3 +23,28 @@ pub fn execute_foresight_checker(args: Value) -> Result<Value, String> {
     );
     Ok(json!(report))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_execute_foresight_checker_valid() {
+        let args = json!({
+            "text": "Includes fallback and error handling.",
+            "requirements_count": 2,
+            "planned_tasks_count": 2
+        });
+        let res = execute_foresight_checker(args);
+        assert!(res.is_ok());
+        let val = res.unwrap();
+        assert!(val.get("foresight_score").is_some());
+    }
+
+    #[test]
+    fn test_execute_foresight_checker_invalid() {
+        let args = json!("not an object");
+        let res = execute_foresight_checker(args);
+        assert!(res.is_err());
+    }
+}

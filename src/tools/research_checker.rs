@@ -13,3 +13,26 @@ pub fn execute_research_checker(args: Value) -> Result<Value, String> {
     let report = ResearchGate::audit(&input.text);
     Ok(json!(report))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_execute_research_checker_valid() {
+        let args = json!({
+            "text": "According to docs.rs and RFC 2024, tree-sitter v0.24 is compatible with Rust 2021. Reference: https://docs.rs/tree-sitter"
+        });
+        let res = execute_research_checker(args);
+        assert!(res.is_ok());
+        let val = res.unwrap();
+        assert_eq!(val["verdict"], "RESEARCH_GROUNDED");
+    }
+
+    #[test]
+    fn test_execute_research_checker_invalid() {
+        let args = json!({ "wrong_arg": 42 });
+        let res = execute_research_checker(args);
+        assert!(res.is_err());
+    }
+}

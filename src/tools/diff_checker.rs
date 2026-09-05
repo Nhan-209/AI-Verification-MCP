@@ -22,3 +22,28 @@ pub fn execute_diff_checker(args: Value) -> Result<Value, String> {
     let report = DiffAnalyzer::analyze(&input.before_code, &input.after_code, &input.language);
     Ok(json!(report))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_execute_diff_checker_valid() {
+        let args = json!({
+            "before_code": "let a = 1;",
+            "after_code": "let a = 2;"
+        });
+        let res = execute_diff_checker(args);
+        assert!(res.is_ok());
+        let val = res.unwrap();
+        assert_eq!(val["lines_before"], 1);
+        assert_eq!(val["lines_after"], 1);
+    }
+
+    #[test]
+    fn test_execute_diff_checker_invalid() {
+        let args = json!({ "before_code": 123 });
+        let res = execute_diff_checker(args);
+        assert!(res.is_err());
+    }
+}

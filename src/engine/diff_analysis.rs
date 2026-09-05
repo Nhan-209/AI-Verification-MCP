@@ -45,8 +45,7 @@ impl DiffAnalyzer {
         let m = lines_before.len();
         let n = lines_after.len();
 
-        let lcs_dp = Self::lcs_length(&lines_before, &lines_after);
-        let lcs_len = lcs_dp[m][n];
+        let lcs_len = Self::lcs_length(&lines_before, &lines_after);
 
         let lines_added = n.saturating_sub(lcs_len);
         let lines_removed = m.saturating_sub(lcs_len);
@@ -120,20 +119,29 @@ impl DiffAnalyzer {
         }
     }
 
-    fn lcs_length(a: &[&str], b: &[&str]) -> Vec<Vec<usize>> {
-        let m = a.len();
-        let n = b.len();
-        let mut dp = vec![vec![0usize; n + 1]; m + 1];
-        for i in 1..=m {
-            for j in 1..=n {
-                if a[i - 1].trim() == b[j - 1].trim() {
-                    dp[i][j] = dp[i - 1][j - 1] + 1;
+    fn lcs_length(a: &[&str], b: &[&str]) -> usize {
+        if a.is_empty() || b.is_empty() {
+            return 0;
+        }
+
+        let (short, long) = if a.len() <= b.len() { (a, b) } else { (b, a) };
+        let n = short.len();
+        let mut prev = vec![0usize; n + 1];
+        let mut curr = vec![0usize; n + 1];
+
+        for long_line in long {
+            let l_trimmed = long_line.trim();
+            for (j, short_line) in short.iter().enumerate() {
+                if l_trimmed == short_line.trim() {
+                    curr[j + 1] = prev[j] + 1;
                 } else {
-                    dp[i][j] = dp[i - 1][j].max(dp[i][j - 1]);
+                    curr[j + 1] = curr[j].max(prev[j + 1]);
                 }
             }
+            std::mem::swap(&mut prev, &mut curr);
+            curr.fill(0);
         }
-        dp
+        prev[n]
     }
 
     fn compute_complexity(code: &str) -> ComplexitySnapshot {
@@ -234,5 +242,23 @@ mod tests {
         assert_eq!(report.lines_before, 0);
         assert_eq!(report.lines_added, 1);
         assert_eq!(report.lines_removed, 0);
+    }
+
+    #[test]
+    fn test_complete_deletion() {
+        let before = "fn foo() {\n    let x = 1;\n}\n";
+        let report = DiffAnalyzer::analyze(before, "", "rust");
+        assert_eq!(report.lines_after, 0);
+        assert!(report.lines_removed > 0);
+        assert_eq!(report.lines_added, 0);
+    }
+
+    #[test]
+    fn test_large_diff_efficiency() {
+        let before = "let x = 1;\n".repeat(1000);
+        let after = "let x = 2;\n".repeat(1000);
+        let report = DiffAnalyzer::analyze(&before, &after, "rust");
+        assert_eq!(report.lines_before, 1000);
+        assert_eq!(report.lines_after, 1000);
     }
 }
