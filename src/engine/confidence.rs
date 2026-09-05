@@ -126,8 +126,21 @@ impl ConfidenceAnalyzer {
             || trimmed.contains("https://")
             || trimmed.contains(".rs")
             || trimmed.contains(".ts")
+            || trimmed.contains(".js")
             || trimmed.contains(".py")
+            || trimmed.contains(".go")
+            || trimmed.contains(".java")
+            || trimmed.contains(".c")
+            || trimmed.contains(".cpp")
             || trimmed.contains(".toml")
+            || trimmed.contains(".json")
+            || trimmed.contains(".yaml")
+            || trimmed.contains(".yml")
+            || trimmed.to_lowercase().contains("rfc")
+            || trimmed.contains("IEEE")
+            || trimmed.contains("ISO")
+            || trimmed.contains("C:\\")
+            || trimmed.contains("D:\\")
             || (trimmed.contains('/') && (trimmed.contains("/var") || trimmed.contains("/etc") || trimmed.contains("/usr") || trimmed.contains("/home") || trimmed.contains("/path")));
 
         // 3. Overconfidence & Absolute Claim detection (Bilingual EN/VI)
@@ -138,10 +151,15 @@ impl ConfidenceAnalyzer {
             let lower_sentence = sentence.to_lowercase();
             for &abs_phrase in OVERCONFIDENCE_PHRASES {
                 if lower_sentence.contains(abs_phrase) {
+                    if Self::is_empirical_or_contract_context(&lower_sentence, abs_phrase) {
+                        // Legitimate metric or specification citation, not subjective arrogance
+                        continue;
+                    }
+
                     overconfidence_count += 1.0;
                     if !has_hard_evidence {
                         unverified_claims.push(format!(
-                            "Absolute assertion '{}' made without empirical evidence: \"{}\"",
+                            "Subjective overconfidence assertion '{}' made without empirical evidence: \"{}\"",
                             abs_phrase, sentence.trim()
                         ));
                     }
@@ -281,6 +299,36 @@ impl ConfidenceAnalyzer {
             suggestions,
         }
     }
+
+    /// Distinguishes legitimate empirical metrics and specification contracts from subjective overconfidence.
+    fn is_empirical_or_contract_context(sentence: &str, phrase: &str) -> bool {
+        let lower = sentence.to_lowercase();
+
+        // 1. "100%" used in metric context: "100% coverage", "100% test", "100% pass", "100% accuracy"
+        if phrase == "100%" || phrase == "100" {
+            const METRIC_CONTEXTS: &[&str] = &[
+                "coverage", "test", "pass", "compliant", "compliance", "accuracy", "cpu", "memory",
+                "disk", "uptime", "bao phủ", "kiểm thử", "vượt qua", "tỷ lệ", "chỉ số",
+                "scale", "zoom", "percentile"
+            ];
+            if METRIC_CONTEXTS.iter().any(|&m| lower.contains(m)) {
+                return true;
+            }
+        }
+
+        // 2. "guaranteed" used in protocol contract context: "guaranteed by RFC", "guaranteed under the protocol"
+        if phrase == "guaranteed" || phrase == "đảm bảo" {
+            const SPEC_CONTEXTS: &[&str] = &[
+                "by the", "by rfc", "under the", "according to", "by spec", "by design",
+                "contract", "specification", "bởi chuẩn", "theo rfc", "theo chuẩn", "theo đặc tả"
+            ];
+            if SPEC_CONTEXTS.iter().any(|&s| lower.contains(s)) {
+                return true;
+            }
+        }
+
+        false
+    }
 }
 
 #[cfg(test)]
@@ -302,6 +350,22 @@ mod tests {
         assert!(report.overconfidence_score > 0.0);
         assert_eq!(report.verdict, "OVERCONFIDENT");
         assert!(!report.unverified_claims.is_empty());
+    }
+
+    #[test]
+    fn test_empirical_metric_not_overconfident() {
+        let text = "We achieved 100% test coverage across all modules in tests/mcp_integration.rs. All 70 assertions passed.";
+        let report = ConfidenceAnalyzer::analyze(text);
+        assert_eq!(report.overconfidence_score, 0.0, "100% test coverage must not be flagged as overconfidence");
+        assert_eq!(report.verdict, "CALIBRATED");
+    }
+
+    #[test]
+    fn test_contract_guaranteed_not_overconfident() {
+        let text = "Message delivery ordering is guaranteed by the TCP RFC 793 protocol contract. See: https://tools.ietf.org/html/rfc793";
+        let report = ConfidenceAnalyzer::analyze(text);
+        assert_eq!(report.overconfidence_score, 0.0, "Specification guarantees must not be flagged as overconfidence");
+        assert_eq!(report.verdict, "CALIBRATED");
     }
 
     #[test]

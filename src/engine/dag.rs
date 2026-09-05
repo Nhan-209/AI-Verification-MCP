@@ -26,6 +26,8 @@ pub struct DagMetrics {
     pub coverage_ratio: f64,
     pub scope_creep_count: usize,
     pub unapproved_tasks: Vec<String>,
+    #[serde(default)]
+    pub justified_explorations: Vec<String>,
     pub dependency_violations: Vec<String>,
     pub is_valid: bool,
 }
@@ -100,6 +102,30 @@ impl PlanDag {
         }
     }
 
+    /// Checks if an unplanned task is a benign exploratory or verification step.
+    pub fn is_exploratory_action(action_id: &str) -> bool {
+        let lower = action_id.to_lowercase();
+        if lower.starts_with("implement")
+            || lower.starts_with("create")
+            || lower.starts_with("build")
+            || lower.starts_with("add")
+            || lower.starts_with("modify")
+            || lower.starts_with("delete")
+            || lower.starts_with("remove")
+            || lower.starts_with("thực thi")
+            || lower.starts_with("xóa")
+            || lower.starts_with("tạo")
+        {
+            return false;
+        }
+        const EXPLORATORY_KEYWORDS: &[&str] = &[
+            "read", "view", "check", "inspect", "grep", "search", "list",
+            "find", "stat", "status", "test", "audit", "verify", "diff",
+            "khảo sát", "đọc", "kiểm tra", "tìm", "tra cứu"
+        ];
+        EXPLORATORY_KEYWORDS.iter().any(|&k| lower.contains(k))
+    }
+
     /// Records an execution step and validates it against dependencies and approved scope.
     pub fn record_step(&mut self, task_id: &str) -> Result<String, String> {
         self.execution_log.push(task_id.to_string());
@@ -117,11 +143,18 @@ impl PlanDag {
                 }
             }
         } else {
-            // Not in plan: Scope Creep
-            return Err(format!(
-                "Scope creep violation: Task '{}' was executed but not present in approved plan DAG",
-                task_id
-            ));
+            // Unplanned action: distinguish justified exploration from actual scope creep
+            if Self::is_exploratory_action(task_id) {
+                return Ok(format!(
+                    "Justified discovery step '{}' recorded (exploratory action outside plan DAG)",
+                    task_id
+                ));
+            } else {
+                return Err(format!(
+                    "Scope creep violation: Task '{}' was executed but not present in approved plan DAG",
+                    task_id
+                ));
+            }
         }
 
         if let Some(task) = self.tasks.get_mut(task_id) {
@@ -165,9 +198,14 @@ impl PlanDag {
         }
 
         let mut unapproved_tasks = Vec::new();
+        let mut justified_explorations = Vec::new();
         for task_id in &self.execution_log {
             if !self.tasks.contains_key(task_id) {
-                unapproved_tasks.push(task_id.clone());
+                if Self::is_exploratory_action(task_id) {
+                    justified_explorations.push(task_id.clone());
+                } else {
+                    unapproved_tasks.push(task_id.clone());
+                }
             }
         }
 
@@ -186,6 +224,7 @@ impl PlanDag {
             coverage_ratio,
             scope_creep_count,
             unapproved_tasks,
+            justified_explorations,
             dependency_violations,
             is_valid,
         }
@@ -249,5 +288,24 @@ mod tests {
         dag.add_task("b", "Task B", vec!["a".to_string()]);
 
         assert!(dag.validate_graph().is_err());
+    }
+
+    #[test]
+    fn test_justified_discovery_step() {
+        let mut dag = PlanDag::new();
+        dag.add_task("t1", "Implement", vec![]);
+
+        // Execute planned step
+        assert!(dag.record_step("t1").is_ok());
+
+        // Execute exploratory steps (read/view/check/test) not explicitly in plan
+        assert!(dag.record_step("inspect_logs").is_ok());
+        assert!(dag.record_step("view_file_summary").is_ok());
+        assert!(dag.record_step("run_cargo_test").is_ok());
+
+        let metrics = dag.evaluate_metrics();
+        assert_eq!(metrics.scope_creep_count, 0, "Exploratory steps must not count as scope creep");
+        assert_eq!(metrics.justified_explorations.len(), 3);
+        assert!(metrics.is_valid);
     }
 }

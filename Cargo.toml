@@ -1,9 +1,9 @@
 [package]
 name = "mcp-plugin-math"
-version = "0.4.0"
+version = "0.5.0"
 edition = "2021"
 authors = ["Nhan-209"]
-description = "High-performance Rust MCP Server for AI Metacognition & Formal Mathematical Verification"
+description = "High-performance Rust MCP Server for AI Agent Verification & Governance Layer"
 license = "MIT"
 readme = "README.md"
 repository = "https://github.com/Nhan-209/mcp-plugin-math"
