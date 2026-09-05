@@ -115,7 +115,9 @@ impl ResearchGate {
     }
 
     /// Recognizes structured standard identifiers while rejecting bare acronym mentions.
-    pub fn match_structured_standard(lower: &str) -> Option<String> {
+    pub fn match_structured_standards(lower: &str) -> Vec<String> {
+        let mut results = Vec::new();
+
         // Structured IEEE standards, e.g. "ieee 754", "ieee 802.11", "ieee standard"
         if let Some(pos) = lower.find("ieee") {
             let after = lower[pos + 4..].trim_start();
@@ -124,9 +126,9 @@ impl ResearchGate {
                     .chars()
                     .take_while(|c| c.is_alphanumeric() || *c == '.' || *c == '-')
                     .collect();
-                return Some(format!("Recognized standard: IEEE {}", token));
+                results.push(format!("Recognized standard: IEEE {}", token));
             } else if after.starts_with("standard") || after.starts_with("std") {
-                return Some("Recognized standard: IEEE Standard".to_string());
+                results.push("Recognized standard: IEEE Standard".to_string());
             }
         }
 
@@ -138,9 +140,9 @@ impl ResearchGate {
                     .chars()
                     .take_while(|c| c.is_ascii_digit() || *c == '-')
                     .collect();
-                return Some(format!("Recognized standard: ISO/IEC {}", token));
+                results.push(format!("Recognized standard: ISO/IEC {}", token));
             } else {
-                return Some("Recognized standard: ISO/IEC specification".to_string());
+                results.push("Recognized standard: ISO/IEC specification".to_string());
             }
         } else if let Some(pos) = lower.find("iso") {
             let after = lower[pos + 3..].trim_start();
@@ -149,7 +151,7 @@ impl ResearchGate {
                     .chars()
                     .take_while(|c| c.is_ascii_digit() || *c == '-')
                     .collect();
-                return Some(format!("Recognized standard: ISO {}", token));
+                results.push(format!("Recognized standard: ISO {}", token));
             }
         }
 
@@ -158,7 +160,7 @@ impl ResearchGate {
             || lower.contains("w3c spec")
             || lower.contains("w3c standard")
         {
-            return Some("Recognized standard: W3C Recommendation".to_string());
+            results.push("Recognized standard: W3C Recommendation".to_string());
         }
 
         // ANSI standard
@@ -169,11 +171,11 @@ impl ResearchGate {
                     .chars()
                     .take_while(|c| c.is_alphanumeric() || *c == '.' || *c == '-')
                     .collect();
-                return Some(format!("Recognized standard: ANSI {}", token));
+                results.push(format!("Recognized standard: ANSI {}", token));
             }
         }
 
-        None
+        results
     }
 
     /// Evaluates evidence citations present in a specific sentence.
@@ -258,7 +260,7 @@ impl ResearchGate {
         }
 
         // 5. Recognized structured standards markers (rejects bare acronym mentions)
-        if let Some(std_name) = Self::match_structured_standard(&lower) {
+        for std_name in Self::match_structured_standards(&lower) {
             sources.push(std_name);
             verified += 1;
         }
