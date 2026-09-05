@@ -70,12 +70,21 @@ pub fn smart_split_sentences(text: &str) -> Vec<String> {
     let len = chars.len();
     let mut start_idx = 0;
     let mut in_code_block = false;
+    let mut in_inline_code = false;
+
+    // Pre-check code fences: ensure dangling unclosed fence doesn't swallow document
+    let total_fences = text.matches("```").count();
+    let max_toggleable_fences = total_fences - (total_fences % 2);
+    let mut fences_seen = 0;
 
     let mut i = 0;
     while i < len {
         // Toggle markdown code fence
         if i + 2 < len && chars[i] == '`' && chars[i + 1] == '`' && chars[i + 2] == '`' {
-            in_code_block = !in_code_block;
+            fences_seen += 1;
+            if fences_seen <= max_toggleable_fences {
+                in_code_block = !in_code_block;
+            }
             i += 3;
             continue;
         }
@@ -86,6 +95,22 @@ pub fn smart_split_sentences(text: &str) -> Vec<String> {
         }
 
         let c = chars[i];
+
+        // Toggle inline backtick code (reset at newline)
+        if c == '`' {
+            in_inline_code = !in_inline_code;
+            i += 1;
+            continue;
+        }
+
+        if in_inline_code {
+            if c == '\n' {
+                in_inline_code = false;
+            } else {
+                i += 1;
+                continue;
+            }
+        }
 
         // Break on newline if previous line had content
         if c == '\n' {
@@ -140,21 +165,34 @@ pub fn smart_split_sentences(text: &str) -> Vec<String> {
                 }
             }
 
-            // Must be followed by whitespace, closing quote/paren + whitespace, or EOF
-            let is_boundary = if i + 1 >= len {
+            // Consume trailing punctuation (e.g. '...', '?!') and closing delimiters
+            let mut end_idx = i;
+            while end_idx + 1 < len && matches!(chars[end_idx + 1], '.' | '!' | '?') {
+                end_idx += 1;
+            }
+            while end_idx + 1 < len
+                && matches!(
+                    chars[end_idx + 1],
+                    ')' | '"' | '\'' | '”' | '’' | ']' | '}' | '»'
+                )
+            {
+                end_idx += 1;
+            }
+
+            let is_boundary = if end_idx + 1 >= len {
                 true
             } else {
-                let next = chars[i + 1];
-                next.is_whitespace() || (i + 2 < len && (next == ')' || next == '"' || next == '\'') && chars[i + 2].is_whitespace())
+                chars[end_idx + 1].is_whitespace()
             };
 
             if is_boundary {
-                let chunk: String = chars[start_idx..=i].iter().collect();
+                let chunk: String = chars[start_idx..=end_idx].iter().collect();
                 let cleaned = chunk.trim();
                 if !cleaned.is_empty() {
                     sentences.push(cleaned.to_string());
                 }
-                start_idx = i + 1;
+                start_idx = end_idx + 1;
+                i = end_idx;
             }
         }
 
@@ -206,5 +244,46 @@ mod tests {
 
         assert!(!sentences.is_empty());
         assert_eq!(sentences.last().unwrap(), "Done.");
+    }
+
+    #[test]
+    fn test_smart_split_closing_quotes() {
+        let text = "He said \"Hello.\" She replied \"Hi!\" They walked away.";
+        let sentences = smart_split_sentences(text);
+
+        assert_eq!(sentences.len(), 3);
+        assert_eq!(sentences[0], "He said \"Hello.\"");
+        assert_eq!(sentences[1], "She replied \"Hi!\"");
+        assert_eq!(sentences[2], "They walked away.");
+    }
+
+    #[test]
+    fn test_smart_split_inline_code() {
+        let text = "Check `foo.bar()` method. Next line.";
+        let sentences = smart_split_sentences(text);
+
+        assert_eq!(sentences.len(), 2);
+        assert_eq!(sentences[0], "Check `foo.bar()` method.");
+        assert_eq!(sentences[1], "Next line.");
+    }
+
+    #[test]
+    fn test_smart_split_unclosed_fence() {
+        let text = "Some preamble.\n```\nUnclosed code\nMore text.";
+        let sentences = smart_split_sentences(text);
+
+        assert!(sentences.len() >= 2);
+        assert_eq!(sentences[0], "Some preamble.");
+    }
+
+    #[test]
+    fn test_smart_split_multi_punctuation() {
+        let text = "Really??? Wow... Done!";
+        let sentences = smart_split_sentences(text);
+
+        assert_eq!(sentences.len(), 3);
+        assert_eq!(sentences[0], "Really???");
+        assert_eq!(sentences[1], "Wow...");
+        assert_eq!(sentences[2], "Done!");
     }
 }

@@ -20,3 +20,27 @@ pub fn execute_code_evaluator(args: Value) -> Result<Value, String> {
     let metrics = CodeAnalyzer::analyze(&input.code, &input.language);
     Ok(json!(metrics))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_execute_code_evaluator_valid() {
+        let args = json!({
+            "code": "fn test() -> i32 { 42 }",
+            "language": "rust"
+        });
+        let res = execute_code_evaluator(args);
+        assert!(res.is_ok());
+        let val = res.unwrap();
+        assert!(val.get("cyclomatic_complexity").is_some());
+    }
+
+    #[test]
+    fn test_execute_code_evaluator_invalid() {
+        let args = json!({ "wrong": 123 });
+        let res = execute_code_evaluator(args);
+        assert!(res.is_err());
+    }
+}

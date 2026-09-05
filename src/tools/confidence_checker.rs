@@ -20,3 +20,26 @@ pub fn execute_confidence_checker(args: Value) -> Result<Value, String> {
     
     Ok(json!(report))
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_execute_confidence_checker_valid() {
+        let args = json!({
+            "text": "This is a tested statement with evidence at https://example.com"
+        });
+        let res = execute_confidence_checker(args);
+        assert!(res.is_ok());
+        let val = res.unwrap();
+        assert!(val.get("calibration_score").is_some());
+    }
+
+    #[test]
+    fn test_execute_confidence_checker_invalid() {
+        let args = json!({ "wrong_key": 123 });
+        let res = execute_confidence_checker(args);
+        assert!(res.is_err());
+    }
+}

@@ -1,8 +1,5 @@
+use mcp_plugin_math::mcp;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
-
-mod engine;
-mod mcp;
-mod tools;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -22,10 +19,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         match serde_json::from_str::<mcp::JsonRpcRequest>(trimmed) {
             Ok(request) => {
                 if let Some(response) = mcp::handle_request(request) {
-                    let mut response_bytes = serde_json::to_vec(&response)?;
-                    response_bytes.push(b'\n');
-                    stdout.write_all(&response_bytes).await?;
-                    stdout.flush().await?;
+                    match serde_json::to_vec(&response) {
+                        Ok(mut response_bytes) => {
+                            response_bytes.push(b'\n');
+                            if let Err(e) = stdout.write_all(&response_bytes).await {
+                                eprintln!("Failed to write response to stdout: {}", e);
+                            } else if let Err(e) = stdout.flush().await {
+                                eprintln!("Failed to flush stdout: {}", e);
+                            }
+                        }
+                        Err(e) => eprintln!("Failed to serialize response: {}", e),
+                    }
                 }
             }
             Err(err) => {
@@ -39,10 +43,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         data: None,
                     }),
                 };
-                let mut response_bytes = serde_json::to_vec(&err_response)?;
-                response_bytes.push(b'\n');
-                stdout.write_all(&response_bytes).await?;
-                stdout.flush().await?;
+                match serde_json::to_vec(&err_response) {
+                    Ok(mut response_bytes) => {
+                        response_bytes.push(b'\n');
+                        if let Err(e) = stdout.write_all(&response_bytes).await {
+                            eprintln!("Failed to write error response: {}", e);
+                        } else if let Err(e) = stdout.flush().await {
+                            eprintln!("Failed to flush error response: {}", e);
+                        }
+                    }
+                    Err(e) => eprintln!("Failed to serialize error response: {}", e),
+                }
             }
         }
     }

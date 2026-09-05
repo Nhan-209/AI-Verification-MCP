@@ -11,23 +11,42 @@ pub fn handle_request(req: JsonRpcRequest) -> Option<JsonRpcResponse> {
     let method = req.method.as_str();
     let id = req.id.clone();
 
+    // Validate JSON-RPC version
+    if req.jsonrpc != "2.0" {
+        return Some(JsonRpcResponse {
+            jsonrpc: "2.0".to_string(),
+            id,
+            result: None,
+            error: Some(JsonRpcError {
+                code: -32600,
+                message: format!(
+                    "Invalid Request: jsonrpc version must be '2.0', got '{}'",
+                    req.jsonrpc
+                ),
+                data: None,
+            }),
+        });
+    }
+
     // Notifications do not expect a response
     if method == "notifications/initialized" || method.starts_with("notifications/") {
         return None;
     }
 
     let response = match method {
-        "initialize" => JsonRpcResponse {
+        "initialize" | "server/discover" => JsonRpcResponse {
             jsonrpc: "2.0".to_string(),
             id,
             result: Some(json!({
                 "protocolVersion": "2024-11-05",
                 "capabilities": {
-                    "tools": {}
+                    "tools": {},
+                    "resources": {},
+                    "prompts": {}
                 },
                 "serverInfo": {
                     "name": "mcp-plugin-math",
-                    "version": "0.3.0"
+                    "version": env!("CARGO_PKG_VERSION")
                 }
             })),
             error: None,
@@ -36,6 +55,22 @@ pub fn handle_request(req: JsonRpcRequest) -> Option<JsonRpcResponse> {
             jsonrpc: "2.0".to_string(),
             id,
             result: Some(json!({})),
+            error: None,
+        },
+        "resources/list" => JsonRpcResponse {
+            jsonrpc: "2.0".to_string(),
+            id,
+            result: Some(json!({
+                "resources": []
+            })),
+            error: None,
+        },
+        "prompts/list" => JsonRpcResponse {
+            jsonrpc: "2.0".to_string(),
+            id,
+            result: Some(json!({
+                "prompts": []
+            })),
             error: None,
         },
         "tools/list" => JsonRpcResponse {
@@ -89,4 +124,81 @@ pub fn handle_request(req: JsonRpcRequest) -> Option<JsonRpcResponse> {
     };
 
     Some(response)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_handle_initialize() {
+        let req = JsonRpcRequest {
+            jsonrpc: "2.0".to_string(),
+            id: Some(json!(1)),
+            method: "initialize".to_string(),
+            params: None,
+        };
+        let res = handle_request(req).expect("Should return response");
+        assert_eq!(res.jsonrpc, "2.0");
+        assert_eq!(res.id, Some(json!(1)));
+        assert!(res.error.is_none());
+        let result = res.result.unwrap();
+        assert_eq!(result["serverInfo"]["name"], "mcp-plugin-math");
+    }
+
+    #[test]
+    fn test_handle_resources_and_prompts_list() {
+        let req_res = JsonRpcRequest {
+            jsonrpc: "2.0".to_string(),
+            id: Some(json!(2)),
+            method: "resources/list".to_string(),
+            params: None,
+        };
+        let res = handle_request(req_res).expect("Should return response");
+        assert_eq!(res.result.unwrap()["resources"], json!([]));
+
+        let req_prompt = JsonRpcRequest {
+            jsonrpc: "2.0".to_string(),
+            id: Some(json!(3)),
+            method: "prompts/list".to_string(),
+            params: None,
+        };
+        let res = handle_request(req_prompt).expect("Should return response");
+        assert_eq!(res.result.unwrap()["prompts"], json!([]));
+    }
+
+    #[test]
+    fn test_handle_notifications_return_none() {
+        let req = JsonRpcRequest {
+            jsonrpc: "2.0".to_string(),
+            id: None,
+            method: "notifications/initialized".to_string(),
+            params: None,
+        };
+        assert!(handle_request(req).is_none());
+    }
+
+    #[test]
+    fn test_handle_invalid_jsonrpc_version() {
+        let req = JsonRpcRequest {
+            jsonrpc: "1.0".to_string(),
+            id: Some(json!(4)),
+            method: "ping".to_string(),
+            params: None,
+        };
+        let res = handle_request(req).expect("Should return error response");
+        assert_eq!(res.error.unwrap().code, -32600);
+    }
+
+    #[test]
+    fn test_handle_unknown_method() {
+        let req = JsonRpcRequest {
+            jsonrpc: "2.0".to_string(),
+            id: Some(json!(5)),
+            method: "non_existent_method".to_string(),
+            params: None,
+        };
+        let res = handle_request(req).expect("Should return error response");
+        assert_eq!(res.error.unwrap().code, -32601);
+    }
 }

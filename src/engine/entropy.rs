@@ -86,13 +86,12 @@ impl TextEvaluator {
 
         for word in &words {
             let lower = word.to_lowercase();
-            *freq_map.entry(lower.clone()).or_insert(0usize) += 1;
-
             let syl = Self::count_syllables(&lower);
             total_syllables += syl;
             if syl >= 3 {
                 complex_words += 1;
             }
+            *freq_map.entry(lower).or_insert(0usize) += 1;
         }
 
         let unique_words = freq_map.len();
@@ -264,5 +263,20 @@ mod tests {
     fn test_empty_string() {
         let metrics = TextEvaluator::evaluate("");
         assert_eq!(metrics.word_count, 0);
+    }
+
+    #[test]
+    fn test_single_character() {
+        let metrics = TextEvaluator::evaluate("a");
+        assert_eq!(metrics.word_count, 1);
+        assert!(metrics.shannon_entropy_bits >= 0.0);
+    }
+
+    #[test]
+    fn test_unicode_vietnamese() {
+        let sample = "Toán học và logic là nền tảng của trí tuệ nhân tạo. Kiểm thử độ đo entropy chính xác.";
+        let metrics = TextEvaluator::evaluate(sample);
+        assert!(metrics.word_count > 5);
+        assert!(metrics.shannon_entropy_bits > 0.0);
     }
 }

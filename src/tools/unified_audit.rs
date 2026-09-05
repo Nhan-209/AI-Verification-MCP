@@ -285,3 +285,64 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
 
     serde_json::to_value(report).map_err(|e| e.to_string())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_unified_audit_empty_input() {
+        let args = json!({});
+        let result = execute_unified_audit(args);
+        assert!(result.is_ok());
+        let val = result.unwrap();
+        assert_eq!(val["verdict"], "PASS");
+        assert_eq!(val["composite_score"], 100.0);
+    }
+
+    #[test]
+    fn test_unified_audit_full_happy_path() {
+        let args = json!({
+            "user_requirements": ["implement helper", "add tests"],
+            "planned_tasks": [
+                {"id": "t1", "name": "implement helper", "dependencies": []},
+                {"id": "t2", "name": "add tests", "dependencies": ["t1"]}
+            ],
+            "executed_steps": ["t1", "t2"],
+            "draft_response": "According to docs.rs and RFC 1234, the helper is implemented in helper.rs. See: https://docs.rs/example",
+            "code_snippet": "fn helper() -> bool { true }",
+            "language": "rust"
+        });
+        let result = execute_unified_audit(args);
+        assert!(result.is_ok());
+        let val = result.unwrap();
+        assert_eq!(val["verdict"], "PASS");
+        assert!(val["composite_score"].as_f64().unwrap() > 70.0);
+        assert!(val["critical_violations"].as_array().unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_unified_audit_critical_violations() {
+        let args = json!({
+            "user_requirements": ["implement helper", "secure auth", "database migration"],
+            "planned_tasks": [
+                {"id": "t1", "name": "implement helper", "dependencies": []}
+            ],
+            "executed_steps": ["t1"],
+            "draft_response": "This is guaranteed 100% flawless and will never fail.",
+        });
+        let result = execute_unified_audit(args);
+        assert!(result.is_ok());
+        let val = result.unwrap();
+        assert_eq!(val["verdict"], "FAIL");
+        let violations = val["critical_violations"].as_array().unwrap();
+        assert!(!violations.is_empty());
+    }
+
+    #[test]
+    fn test_unified_audit_invalid_json() {
+        let args = json!("not an object");
+        let result = execute_unified_audit(args);
+        assert!(result.is_err());
+    }
+}
