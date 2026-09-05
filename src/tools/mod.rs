@@ -18,7 +18,10 @@ pub use foresight_checker::execute_foresight_checker;
 pub use plan_tracker::execute_plan_tracker;
 pub use research_checker::execute_research_checker;
 pub use text_evaluator::execute_text_evaluator;
-pub use unified_audit::execute_unified_audit;
+pub use unified_audit::{
+    execute_unified_audit, AuditViolation, PlanTaskInput, SeveritySummary, UnifiedAuditInput,
+    UnifiedAuditReport, ViolationSeverity,
+};
 
 use crate::mcp::protocol::Tool;
 use serde_json::json;
@@ -27,10 +30,16 @@ pub fn get_available_tools() -> Vec<Tool> {
     vec![
         Tool {
             name: "math_audit_cognition".to_string(),
-            description: "Unified Mathematical Metacognition Gate (6-Pillar Audit). Verifies requirement alignment, plan DAG diligence, text density/entropy, epistemic calibration, empirical research grounding, and proactive foresight all in one call.".to_string(),
+            description: "Unified AI Governance & Metacognition Gate. Evaluates decisions as ALLOW, WARN, or BLOCK across 6 verification pillars: constraints, plan DAG, text density, epistemic calibration, empirical research, and proactive foresight.".to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {
+                    "mode": {
+                        "type": "string",
+                        "enum": ["quick", "standard", "deep"],
+                        "default": "standard",
+                        "description": "Audit depth: 'quick' (<1ms light checks), 'standard' (default full 6-pillar audit), 'deep' (maximum rigor)"
+                    },
                     "user_requirements": {
                         "type": "array",
                         "items": { "type": "string" },

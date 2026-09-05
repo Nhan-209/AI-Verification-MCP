@@ -1,4 +1,4 @@
-﻿use mcp_plugin_math::mcp::{handle_request, JsonRpcRequest};
+use mcp_plugin_math::mcp::{handle_request, JsonRpcRequest};
 use serde_json::json;
 
 #[test]
@@ -49,7 +49,7 @@ fn test_integration_protocol_lifecycle() {
     };
     let list_res = handle_request(list_req).expect("tools/list must respond");
     let tools = list_res.result.unwrap()["tools"].as_array().unwrap().clone();
-    assert_eq!(tools.len(), 9, "Server must expose exactly 9 tools in v0.4.0");
+    assert_eq!(tools.len(), 9, "Server must expose exactly 9 tools in v0.5.0");
 
     // 5. Resources list & Prompts list
     let res_req = JsonRpcRequest {

@@ -27,15 +27,43 @@ pub struct UnifiedAuditInput {
     pub code_snippet: Option<String>,
     #[serde(default)]
     pub language: Option<String>,
+    #[serde(default)]
+    pub mode: Option<String>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub enum ViolationSeverity {
+    Critical,
+    Warning,
+    Info,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AuditViolation {
+    pub code: String,
+    pub message: String,
+    pub severity: ViolationSeverity,
+    pub remediation: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SeveritySummary {
+    pub critical: usize,
+    pub warning: usize,
+    pub info: usize,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UnifiedAuditReport {
+    pub decision: String,
     pub verdict: String,
     pub composite_score: f64,
+    pub severity_summary: SeveritySummary,
     pub math_breakdown: Value,
     pub critical_violations: Vec<String>,
+    pub violations: Vec<AuditViolation>,
     pub recommendations: Vec<String>,
+    pub remediation_plan: Vec<String>,
 }
 
 struct WeightedScore {
@@ -43,15 +71,45 @@ struct WeightedScore {
     weight: f64,
 }
 
+fn add_violation(
+    violations: &mut Vec<AuditViolation>,
+    critical_violations: &mut Vec<String>,
+    recommendations: &mut Vec<String>,
+    code: &str,
+    message: String,
+    severity: ViolationSeverity,
+    remediation: &str,
+) {
+    match severity {
+        ViolationSeverity::Critical => {
+            critical_violations.push(message.clone());
+        }
+        ViolationSeverity::Warning | ViolationSeverity::Info => {
+            recommendations.push(message.clone());
+        }
+    }
+    violations.push(AuditViolation {
+        code: code.to_string(),
+        message,
+        severity,
+        remediation: remediation.to_string(),
+    });
+}
+
 pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
     let input: UnifiedAuditInput = serde_json::from_value(args)
         .map_err(|e| format!("Invalid arguments for math_audit_cognition: {}", e))?;
 
+    let mode_str = input.mode.as_deref().unwrap_or("standard").to_lowercase();
+    let is_quick = mode_str == "quick";
+    let is_deep = mode_str == "deep";
+
+    let mut violations: Vec<AuditViolation> = Vec::new();
     let mut critical_violations = Vec::new();
     let mut recommendations = Vec::new();
     let mut weighted_scores: Vec<WeightedScore> = Vec::new();
 
-    // 1. Constraint Verification (Weight: 0.30)
+    // 1. Constraint Verification (Standard: 0.30, Quick: 0.50)
     let constraint_report = if !input.user_requirements.is_empty() {
         let mut impl_claims: Vec<String> = input.executed_steps.clone();
         for task in &input.planned_tasks {
@@ -65,36 +123,61 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
         let rep = ConstraintEngine::verify(&input.user_requirements, &impl_claims);
 
         if !rep.missing_requirements.is_empty() {
-            critical_violations.push(format!(
-                "Omission Violation: {} user requirement(s) not fulfilled: {:?}",
-                rep.missing_requirements.len(),
-                rep.missing_requirements
-            ));
+            add_violation(
+                &mut violations,
+                &mut critical_violations,
+                &mut recommendations,
+                "CONSTRAINT_CONFLICT",
+                format!(
+                    "Omission Violation: {} user requirement(s) not fulfilled: {:?}",
+                    rep.missing_requirements.len(),
+                    rep.missing_requirements
+                ),
+                ViolationSeverity::Critical,
+                "Implement missing user requirements or update specification scope.",
+            );
         }
 
         if !rep.contradictions.is_empty() {
             for c in &rep.contradictions {
-                critical_violations.push(c.clone());
+                add_violation(
+                    &mut violations,
+                    &mut critical_violations,
+                    &mut recommendations,
+                    "CONSTRAINT_CONFLICT",
+                    c.clone(),
+                    ViolationSeverity::Critical,
+                    "Resolve contradictory constraints between user requirements and implementation.",
+                );
             }
         }
 
         if !rep.scope_creep_items.is_empty() {
-            recommendations.push(format!(
-                "Scope Creep Warning: Found unrequested actions: {:?}",
-                rep.scope_creep_items
-            ));
+            add_violation(
+                &mut violations,
+                &mut critical_violations,
+                &mut recommendations,
+                "SCOPE_CREEP",
+                format!(
+                    "Scope Creep Warning: Found unrequested actions: {:?}",
+                    rep.scope_creep_items
+                ),
+                ViolationSeverity::Warning,
+                "Align actions strictly with approved requirements or request scope change.",
+            );
         }
 
+        let weight = if is_quick { 0.50 } else { 0.30 };
         weighted_scores.push(WeightedScore {
             score: rep.alignment_score * 100.0,
-            weight: 0.30,
+            weight,
         });
         Some(rep)
     } else {
         None
     };
 
-    // 2. Plan DAG Verification (Weight: 0.15)
+    // 2. Plan DAG Verification (Standard: 0.15, Quick: 0.25)
     let dag_report = if !input.planned_tasks.is_empty() {
         let mut dag = PlanDag::new();
         for t in &input.planned_tasks {
@@ -103,95 +186,173 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
 
         for step in &input.executed_steps {
             if let Err(err) = dag.record_step(step) {
-                critical_violations.push(err);
+                add_violation(
+                    &mut violations,
+                    &mut critical_violations,
+                    &mut recommendations,
+                    "PLAN_DEPENDENCY_ERROR",
+                    err,
+                    ViolationSeverity::Critical,
+                    "Reorder tasks according to DAG topological dependencies.",
+                );
             }
         }
 
         let metrics = dag.evaluate_metrics();
         if metrics.scope_creep_count > 0 {
-            recommendations.push(format!(
-                "Graph Waste W > 0: {} step(s) executed outside approved plan DAG",
-                metrics.scope_creep_count
-            ));
+            add_violation(
+                &mut violations,
+                &mut critical_violations,
+                &mut recommendations,
+                "SCOPE_CREEP",
+                format!(
+                    "Graph Waste W > 0: {} step(s) executed outside approved plan DAG",
+                    metrics.scope_creep_count
+                ),
+                ViolationSeverity::Warning,
+                "Register unplanned tasks into plan DAG or remove extraneous execution steps.",
+            );
         }
 
+        if is_deep && metrics.coverage_ratio < 1.0 && !input.executed_steps.is_empty() {
+            add_violation(
+                &mut violations,
+                &mut critical_violations,
+                &mut recommendations,
+                "PLAN_COVERAGE_DEFICIT",
+                format!(
+                    "Deep Audit Warning: Plan execution incomplete (coverage = {:.1}%)",
+                    metrics.coverage_ratio * 100.0
+                ),
+                ViolationSeverity::Warning,
+                "Complete all planned tasks in DAG before final delivery.",
+            );
+        }
+
+        let weight = if is_quick { 0.25 } else { 0.15 };
         weighted_scores.push(WeightedScore {
             score: metrics.coverage_ratio * 100.0,
-            weight: 0.15,
+            weight,
         });
         Some(metrics)
     } else {
         None
     };
 
-    // 3. Text & Epistemic Calibration Evaluation (Weight: 0.15)
+    // 3. Text & Epistemic Calibration Evaluation
     let (text_report, confidence_report) = if let Some(ref text) = input.draft_response {
-        let rep = TextEvaluator::evaluate(text);
-        if rep.is_verbose {
-            recommendations.push(
-                "Verbosity Warning: Information density is low with high token redundancy. Condense response.".to_string(),
-            );
-        }
-        if rep.is_too_complex {
-            recommendations.push(
-                "Readability Warning: Syntax is overly convoluted. Increase clarity.".to_string(),
-            );
-        }
-        for sug in &rep.suggestions {
-            recommendations.push(sug.clone());
-        }
+        let rep = if !is_quick {
+            let tr = TextEvaluator::evaluate(text);
+            if tr.is_verbose {
+                add_violation(
+                    &mut violations,
+                    &mut critical_violations,
+                    &mut recommendations,
+                    "VERBOSITY_WARNING",
+                    "Verbosity Warning: Information density is low with high token redundancy. Condense response.".to_string(),
+                    ViolationSeverity::Info,
+                    "Condense text, eliminate filler phrases, and state answers concisely.",
+                );
+            }
+            if tr.is_too_complex {
+                add_violation(
+                    &mut violations,
+                    &mut critical_violations,
+                    &mut recommendations,
+                    "READABILITY_WARNING",
+                    "Readability Warning: Syntax is overly convoluted. Increase clarity.".to_string(),
+                    ViolationSeverity::Info,
+                    "Simplify phrasing and shorten compound sentences.",
+                );
+            }
+            for sug in &tr.suggestions {
+                recommendations.push(sug.clone());
+            }
+            Some(tr)
+        } else {
+            None
+        };
 
         let conf = ConfidenceAnalyzer::analyze(text);
         if conf.verdict == "OVERCONFIDENT" {
-            critical_violations.push(
-                "Overconfidence Violation: Absolute claims ('guaranteed', '100%') made without proof. Moderate claims or provide citations."
-                    .to_string(),
+            add_violation(
+                &mut violations,
+                &mut critical_violations,
+                &mut recommendations,
+                "CONFIDENCE_UNCALIBRATED",
+                "Overconfidence Violation: Absolute claims ('guaranteed', '100%') made without empirical proof. Moderate claims or provide citations.".to_string(),
+                ViolationSeverity::Critical,
+                "Tone down absolute claims or provide concrete citations and reproducible evidence.",
             );
         } else if conf.verdict == "EVASIVE" {
-            recommendations.push(
-                "Evasive Language Warning: Text displays excessive hedging. Provide grounded answers."
-                    .to_string(),
+            add_violation(
+                &mut violations,
+                &mut critical_violations,
+                &mut recommendations,
+                "CONFIDENCE_UNCALIBRATED",
+                "Evasive Language Warning: Text displays excessive hedging. Provide grounded answers.".to_string(),
+                ViolationSeverity::Warning,
+                "Remove excessive hedging and make direct, evidenced claims.",
             );
         }
         for c in &conf.self_contradictions {
-            critical_violations.push(format!("Self-Contradiction in Response: {}", c));
+            add_violation(
+                &mut violations,
+                &mut critical_violations,
+                &mut recommendations,
+                "LOGICAL_CONTRADICTION",
+                format!("Self-Contradiction in Response: {}", c),
+                ViolationSeverity::Critical,
+                "Resolve contradictory statements within the response.",
+            );
         }
 
+        let weight = if is_quick { 0.25 } else { 0.15 };
         weighted_scores.push(WeightedScore {
             score: conf.calibration_score * 100.0,
-            weight: 0.15,
+            weight,
         });
-        (Some(rep), Some(conf))
+        (rep, Some(conf))
     } else {
         (None, None)
     };
 
-    // 4. Research Gate Evaluation (Weight: 0.10)
-    let research_report = if let Some(ref text) = input.draft_response {
-        let r_rep = ResearchGate::audit(text);
-        if r_rep.has_research_deficit {
-            critical_violations.push(
-                "Research Deficit: Factual technical assertions made without citations. Verify with docs, RFCs, or test logs."
-                    .to_string(),
-            );
-        }
-        for rec in &r_rep.recommendations {
-            recommendations.push(rec.clone());
-        }
+    // 4. Research Gate Evaluation (Skipped in quick mode)
+    let research_report = if !is_quick {
+        if let Some(ref text) = input.draft_response {
+            let r_rep = ResearchGate::audit(text);
+            if r_rep.has_research_deficit {
+                add_violation(
+                    &mut violations,
+                    &mut critical_violations,
+                    &mut recommendations,
+                    "RESEARCH_DEFICIT",
+                    "Research Deficit: Factual technical assertions made without citations. Verify with docs, RFCs, or test logs.".to_string(),
+                    ViolationSeverity::Critical,
+                    "Ground factual claims with official documentation links, RFCs, or benchmark citations.",
+                );
+            }
+            for rec in &r_rep.recommendations {
+                recommendations.push(rec.clone());
+            }
 
-        weighted_scores.push(WeightedScore {
-            score: r_rep.research_score,
-            weight: 0.10,
-        });
-        Some(r_rep)
+            weighted_scores.push(WeightedScore {
+                score: r_rep.research_score,
+                weight: 0.10,
+            });
+            Some(r_rep)
+        } else {
+            None
+        }
     } else {
         None
     };
 
-    // 5. Foresight & Diligence Evaluation (Weight: 0.10)
-    let foresight_report = if input.draft_response.is_some()
-        || input.code_snippet.is_some()
-        || !input.planned_tasks.is_empty()
+    // 5. Foresight & Diligence Evaluation (Skipped in quick mode)
+    let foresight_report = if !is_quick
+        && (input.draft_response.is_some()
+            || input.code_snippet.is_some()
+            || !input.planned_tasks.is_empty())
     {
         let f_rep = ForesightEngine::evaluate(
             input.draft_response.as_deref(),
@@ -200,9 +361,14 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
             input.planned_tasks.len(),
         );
         if f_rep.is_lazy_plan {
-            critical_violations.push(
-                "Lazy Plan Violation: High requirement count but shallow plan breakdown (<=1 task). Decompose plan into concrete steps."
-                    .to_string(),
+            add_violation(
+                &mut violations,
+                &mut critical_violations,
+                &mut recommendations,
+                "LAZY_PLAN",
+                "Lazy Plan Violation: High requirement count but shallow plan breakdown (<=1 task). Decompose plan into concrete steps.".to_string(),
+                ViolationSeverity::Critical,
+                "Break down complex requirement list into discrete, measurable subtasks.",
             );
         }
         for rec in &f_rep.recommendations {
@@ -218,41 +384,71 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
         None
     };
 
-    // 6. Code Metrics Evaluation (Weight: 0.20)
-    let code_report = if let Some(ref code) = input.code_snippet {
-        let lang = input.language.as_deref().unwrap_or("rust");
-        let rep = CodeAnalyzer::analyze(code, lang);
+    // 6. Code Metrics Evaluation (Skipped in quick mode)
+    let code_report = if !is_quick {
+        if let Some(ref code) = input.code_snippet {
+            let lang = input.language.as_deref().unwrap_or("rust");
+            let rep = CodeAnalyzer::analyze(code, lang);
 
-        if rep.has_syntax_errors {
-            critical_violations.push(format!(
-                "Syntax Error: Found {} parsing/AST error(s) in code",
-                rep.syntax_error_count
-            ));
+            if rep.has_syntax_errors {
+                add_violation(
+                    &mut violations,
+                    &mut critical_violations,
+                    &mut recommendations,
+                    "SYNTAX_ERROR",
+                    format!(
+                        "Syntax Error: Found {} parsing/AST error(s) in code",
+                        rep.syntax_error_count
+                    ),
+                    ViolationSeverity::Critical,
+                    "Fix code syntax errors and ensure AST parses cleanly.",
+                );
+            }
+
+            let cyclomatic_threshold = if is_deep { 15 } else { 20 };
+            if rep.cyclomatic_complexity > cyclomatic_threshold {
+                add_violation(
+                    &mut violations,
+                    &mut critical_violations,
+                    &mut recommendations,
+                    "COMPLEXITY_WARNING",
+                    format!(
+                        "High Cyclomatic Complexity M={}: Refactor into smaller sub-functions",
+                        rep.cyclomatic_complexity
+                    ),
+                    ViolationSeverity::Warning,
+                    "Refactor monolithic functions into smaller, single-responsibility helper functions.",
+                );
+            }
+
+            let mi_threshold = if is_deep { 65.0 } else { 50.0 };
+            if rep.maintainability_index < mi_threshold {
+                add_violation(
+                    &mut violations,
+                    &mut critical_violations,
+                    &mut recommendations,
+                    "MAINTAINABILITY_DEFICIT",
+                    format!(
+                        "Low Maintainability Index MI={:.1}: Code is hard to maintain and prone to bugs",
+                        rep.maintainability_index
+                    ),
+                    ViolationSeverity::Warning,
+                    "Simplify control flow, shorten function length, and reduce operand volume.",
+                );
+            }
+
+            for bw in &rep.boundary_warnings {
+                recommendations.push(format!("Boundary Condition Warning: {}", bw));
+            }
+
+            weighted_scores.push(WeightedScore {
+                score: rep.maintainability_index,
+                weight: 0.20,
+            });
+            Some(rep)
+        } else {
+            None
         }
-
-        if rep.cyclomatic_complexity > 20 {
-            recommendations.push(format!(
-                "High Cyclomatic Complexity M={}: Refactor into smaller sub-functions",
-                rep.cyclomatic_complexity
-            ));
-        }
-
-        if rep.maintainability_index < 50.0 {
-            recommendations.push(format!(
-                "Low Maintainability Index MI={:.1}: Code is hard to maintain and prone to bugs",
-                rep.maintainability_index
-            ));
-        }
-
-        for bw in &rep.boundary_warnings {
-            recommendations.push(format!("Boundary Condition Warning: {}", bw));
-        }
-
-        weighted_scores.push(WeightedScore {
-            score: rep.maintainability_index,
-            weight: 0.20,
-        });
-        Some(rep)
     } else {
         None
     };
@@ -269,16 +465,53 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
         }
     };
 
-    let verdict = if critical_violations.is_empty() && composite_score >= 70.0 {
-        "PASS".to_string()
-    } else {
-        "FAIL".to_string()
+    let critical_count = violations
+        .iter()
+        .filter(|v| v.severity == ViolationSeverity::Critical)
+        .count();
+    let warning_count = violations
+        .iter()
+        .filter(|v| v.severity == ViolationSeverity::Warning)
+        .count();
+    let info_count = violations
+        .iter()
+        .filter(|v| v.severity == ViolationSeverity::Info)
+        .count();
+
+    let severity_summary = SeveritySummary {
+        critical: critical_count,
+        warning: warning_count,
+        info: info_count,
     };
 
+    let decision = if critical_count > 0 || composite_score < 50.0 {
+        "BLOCK".to_string()
+    } else if warning_count > 0 || composite_score < 75.0 {
+        "WARN".to_string()
+    } else {
+        "ALLOW".to_string()
+    };
+
+    let verdict = match decision.as_str() {
+        "ALLOW" => "PASS".to_string(),
+        "WARN" => "WARN".to_string(),
+        _ => "FAIL".to_string(),
+    };
+
+    let mut remediation_plan: Vec<String> = Vec::new();
+    for v in &violations {
+        if !remediation_plan.contains(&v.remediation) {
+            remediation_plan.push(v.remediation.clone());
+        }
+    }
+
     let report = UnifiedAuditReport {
+        decision,
         verdict,
         composite_score,
+        severity_summary,
         math_breakdown: json!({
+            "mode": mode_str,
             "constraints": constraint_report,
             "dag": dag_report,
             "text": text_report,
@@ -288,7 +521,9 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
             "code": code_report,
         }),
         critical_violations,
+        violations,
         recommendations,
+        remediation_plan,
     };
 
     serde_json::to_value(report).map_err(|e| e.to_string())
@@ -304,8 +539,10 @@ mod tests {
         let result = execute_unified_audit(args);
         assert!(result.is_ok());
         let val = result.unwrap();
+        assert_eq!(val["decision"], "ALLOW");
         assert_eq!(val["verdict"], "PASS");
         assert_eq!(val["composite_score"], 100.0);
+        assert_eq!(val["severity_summary"]["critical"], 0);
     }
 
     #[test]
@@ -324,8 +561,10 @@ mod tests {
         let result = execute_unified_audit(args);
         assert!(result.is_ok());
         let val = result.unwrap();
+        assert_eq!(val["decision"], "ALLOW");
         assert_eq!(val["verdict"], "PASS");
         assert!(val["composite_score"].as_f64().unwrap() > 70.0);
+        assert_eq!(val["severity_summary"]["critical"], 0);
         assert!(val["critical_violations"].as_array().unwrap().is_empty());
     }
 
@@ -342,9 +581,47 @@ mod tests {
         let result = execute_unified_audit(args);
         assert!(result.is_ok());
         let val = result.unwrap();
+        assert_eq!(val["decision"], "BLOCK");
         assert_eq!(val["verdict"], "FAIL");
-        let violations = val["critical_violations"].as_array().unwrap();
+        let violations = val["violations"].as_array().unwrap();
         assert!(!violations.is_empty());
+        assert!(val["severity_summary"]["critical"].as_u64().unwrap() > 0);
+        assert!(!val["remediation_plan"].as_array().unwrap().is_empty());
+    }
+
+    #[test]
+    fn test_unified_audit_quick_mode() {
+        let args = json!({
+            "mode": "quick",
+            "user_requirements": ["must be fast"],
+            "executed_steps": ["must be fast"],
+            "draft_response": "Execution is verified by tests."
+        });
+        let result = execute_unified_audit(args);
+        assert!(result.is_ok());
+        let val = result.unwrap();
+        assert_eq!(val["decision"], "ALLOW");
+        assert_eq!(val["math_breakdown"]["mode"], "quick");
+        assert!(val["math_breakdown"]["code"].is_null());
+        assert!(val["math_breakdown"]["research"].is_null());
+    }
+
+    #[test]
+    fn test_unified_audit_warning_tier() {
+        let args = json!({
+            "user_requirements": ["handle request"],
+            "planned_tasks": [
+                {"id": "t1", "name": "handle request", "dependencies": []}
+            ],
+            "executed_steps": ["t1", "unplanned_extra_step"],
+            "draft_response": "I think maybe this might work perhaps. Reference: https://docs.rs/example"
+        });
+        let result = execute_unified_audit(args);
+        assert!(result.is_ok());
+        let val = result.unwrap();
+        assert_eq!(val["decision"], "WARN");
+        assert_eq!(val["verdict"], "WARN");
+        assert!(val["severity_summary"]["warning"].as_u64().unwrap() > 0);
     }
 
     #[test]
