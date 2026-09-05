@@ -26,6 +26,9 @@ pub struct CodeMetrics {
     pub has_syntax_errors: bool,
     pub syntax_error_count: usize,
     pub boundary_warnings: Vec<String>,
+    /// Whether the snippet passes the deterministic static quality thresholds
+    pub passes_static_quality_gate: bool,
+    /// Backward-compatible alias for passes_static_quality_gate
     pub is_production_ready: bool,
 }
 
@@ -54,7 +57,7 @@ impl CodeAnalyzer {
 
         let boundary_warnings = Self::check_boundary_conditions(code, lang_hint);
 
-        let is_production_ready = syntax_errors == 0
+        let passes_static_quality_gate = syntax_errors == 0
             && normalized_mi >= 55.0
             && cyclomatic <= 25
             && boundary_warnings.is_empty();
@@ -68,7 +71,8 @@ impl CodeAnalyzer {
             has_syntax_errors: syntax_errors > 0,
             syntax_error_count: syntax_errors,
             boundary_warnings,
-            is_production_ready,
+            passes_static_quality_gate,
+            is_production_ready: passes_static_quality_gate,
         }
     }
 
@@ -317,6 +321,8 @@ mod tests {
         assert!(metrics.cyclomatic_complexity >= 2);
         assert!(!metrics.has_syntax_errors);
         assert!(metrics.maintainability_index > 60.0);
+        assert!(metrics.passes_static_quality_gate);
+        assert_eq!(metrics.passes_static_quality_gate, metrics.is_production_ready);
     }
 
     #[test]

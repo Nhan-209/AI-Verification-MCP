@@ -89,6 +89,25 @@ const UNTRUSTED_OR_PLACEHOLDER_DOMAINS: &[&str] = &[
 pub struct ResearchGate;
 
 impl ResearchGate {
+    /// Extracts the clean hostname from a URL string without protocol, port, or path.
+    pub fn extract_hostname(raw_url: &str) -> Option<String> {
+        let without_proto = if let Some(stripped) = raw_url.strip_prefix("https://") {
+            stripped
+        } else if let Some(stripped) = raw_url.strip_prefix("http://") {
+            stripped
+        } else {
+            return None;
+        };
+
+        let host_port = without_proto.split(['/', '?', '#']).next().unwrap_or("");
+        let host = host_port.split(':').next().unwrap_or("").trim();
+        if host.is_empty() {
+            None
+        } else {
+            Some(host.to_string())
+        }
+    }
+
     /// Evaluates evidence citations present in a specific sentence.
     pub fn evaluate_evidence(sentence: &str) -> (Vec<String>, usize, usize) {
         let mut sources = Vec::new();
@@ -96,15 +115,21 @@ impl ResearchGate {
         let mut unverified = 0;
         let lower = sentence.to_lowercase();
 
-        // 1. URL check & authority validation
+        // 1. URL check & strict hostname authority validation
         if let Some(idx) = lower.find("http://").or_else(|| lower.find("https://")) {
             let url_part = &sentence[idx..];
             let url_token = url_part.split_whitespace().next().unwrap_or("");
-            let clean_url = url_token.trim_matches(|c: char| !c.is_alphanumeric() && c != '/' && c != ':' && c != '-' && c != '.');
+            let clean_url = url_token.trim_matches(|c: char| !c.is_alphanumeric() && c != '/' && c != ':' && c != '-' && c != '.' && c != '_');
             let lower_url = clean_url.to_lowercase();
 
-            let is_placeholder = UNTRUSTED_OR_PLACEHOLDER_DOMAINS.iter().any(|&d| lower_url.contains(d));
-            let is_authoritative = AUTHORITATIVE_DOMAINS.iter().any(|&d| lower_url.contains(d));
+            let host_opt = Self::extract_hostname(&lower_url);
+            let is_placeholder = host_opt.as_ref().map(|h| {
+                UNTRUSTED_OR_PLACEHOLDER_DOMAINS.iter().any(|&d| h == d || h.ends_with(&format!(".{}", d)))
+            }).unwrap_or(false);
+
+            let is_authoritative = host_opt.as_ref().map(|h| {
+                AUTHORITATIVE_DOMAINS.iter().any(|&d| h == d || h.ends_with(&format!(".{}", d)))
+            }).unwrap_or(false);
 
             if is_placeholder {
                 sources.push(format!("Placeholder/unverified URL: '{}'", clean_url));
@@ -113,12 +138,8 @@ impl ResearchGate {
                 sources.push(format!("Authoritative documentation: '{}'", clean_url));
                 verified += 1;
             } else {
-                sources.push(format!("Web link: '{}'", clean_url));
-                if lower_url.contains('/') && lower_url.len() > 15 {
-                    verified += 1;
-                } else {
-                    unverified += 1;
-                }
+                sources.push(format!("General web link (unverified authority): '{}'", clean_url));
+                unverified += 1;
             }
         }
 
@@ -141,7 +162,7 @@ impl ResearchGate {
             }
         }
 
-        // 3. Local file path check
+        // 3. Local file path check (requires actual file existence on disk)
         for w in sentence.split_whitespace() {
             let clean = w.trim_matches(|c: char| !c.is_alphanumeric() && c != '/' && c != '\\' && c != '.');
             if (clean.contains('/') || clean.contains('\\'))
@@ -161,16 +182,10 @@ impl ResearchGate {
                     sources.push(format!("Verified local file path: '{}'", clean));
                     verified += 1;
                 } else {
-                    sources.push(format!("Code file reference: '{}'", clean));
-                    verified += 1;
+                    sources.push(format!("Unverified file reference (does not exist): '{}'", clean));
+                    unverified += 1;
                 }
             }
-        }
-
-        // 4. Code snippet block
-        if sentence.contains("```") {
-            sources.push("Executable code block".to_string());
-            verified += 1;
         }
 
         // 5. Recognized standards body markers
