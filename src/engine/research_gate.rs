@@ -91,13 +91,9 @@ pub struct ResearchGate;
 impl ResearchGate {
     /// Extracts the clean hostname from a URL string without protocol, port, or path.
     pub fn extract_hostname(raw_url: &str) -> Option<String> {
-        let without_proto = if let Some(stripped) = raw_url.strip_prefix("https://") {
-            stripped
-        } else if let Some(stripped) = raw_url.strip_prefix("http://") {
-            stripped
-        } else {
-            return None;
-        };
+        let without_proto = raw_url
+            .strip_prefix("https://")
+            .or_else(|| raw_url.strip_prefix("http://"))?;
 
         let host_port = without_proto.split(['/', '?', '#']).next().unwrap_or("");
         let host = host_port.split(':').next().unwrap_or("").trim();

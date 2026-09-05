@@ -113,7 +113,7 @@ impl PlanDag {
             "xóa", "tạo", "sửa", "thêm", "chạy",
         ];
         
-        let tokens: Vec<&str> = lower.split(|c: char| c == '_' || c == '-' || c == ' ' || c == '.' || c == ':').collect();
+        let tokens: Vec<&str> = lower.split(['_', '-', ' ', '.', ':']).collect();
         if tokens.iter().any(|&t| DISQUALIFYING_TERMS.contains(&t)) {
             return false;
         }
