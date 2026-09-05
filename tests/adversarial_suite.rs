@@ -245,3 +245,82 @@ fn test_deep_mode_incomplete_coverage_blocked() {
     let violations = res["violations"].as_array().unwrap();
     assert!(violations.iter().any(|v| v["code"] == "PLAN_COVERAGE_DEFICIT" && v["severity"] == "Critical"));
 }
+
+#[test]
+fn test_partial_input_score_gaming_rejected() {
+    // Arrange: Draft response with high confidence and verified citations, but no requirements/plan
+    let payload = json!({
+        "draft_response": "The complete architecture is implemented according to RFC 2119 and verified with unit tests. See: https://docs.rs/serde"
+    });
+
+    // Act
+    let res = execute_unified_audit(payload).expect("Unified audit execution failed");
+
+    // Assert: Standard mode invariant enforces mandatory contract - score gaming must yield INSUFFICIENT_EVIDENCE
+    assert_ne!(res["decision"], "ALLOW", "Isolated draft response must not receive ALLOW");
+    assert_eq!(res["decision"], "INSUFFICIENT_EVIDENCE");
+    assert_eq!(res["verdict"], "UNVERIFIED");
+    let violations = res["violations"].as_array().unwrap();
+    assert!(
+        violations.iter().any(|v| v["code"] == "CONTRACT_EVIDENCE_MISSING"),
+        "Missing user_requirements or planned_tasks must trigger CONTRACT_EVIDENCE_MISSING"
+    );
+}
+
+#[test]
+fn test_mixed_evidence_partial_spoofing_rejected() {
+    // Arrange: Claim A has valid docs.rs citation, but Claim B cites uncataloged RFC 9999
+    let mixed_text = "According to https://docs.rs/serde, version v1.0 is stable.\nMeanwhile latency of v2.0 is 0.01ms as per RFC 9999.";
+
+    // Act - Unit verification
+    let report = ResearchGate::audit(mixed_text);
+
+    // Assert - Engine layer: Claim A does not launder Claim B
+    assert!(report.has_research_deficit, "Universal Grounding: unverified Claim B must trigger research deficit");
+    assert_eq!(report.unverified_claims.len(), 1);
+
+    // Act - Unified audit layer
+    let payload = json!({
+        "user_requirements": ["implement low latency serializer"],
+        "planned_tasks": [{"id": "t1", "name": "implement low latency serializer", "dependencies": []}],
+        "executed_steps": ["t1"],
+        "draft_response": mixed_text,
+    });
+    let res = execute_unified_audit(payload).expect("Unified audit execution failed");
+
+    // Assert - Decision must be BLOCK due to ungrounded technical claim
+    assert_eq!(res["decision"], "BLOCK");
+    assert_eq!(res["verdict"], "FAIL");
+    let violations = res["violations"].as_array().unwrap();
+    assert!(violations.iter().any(|v| v["code"] == "RESEARCH_DEFICIT" && v["severity"] == "Critical"));
+}
+
+#[test]
+fn test_uncataloged_rfc_flagged_unverified() {
+    // Arrange: RFC 9999 is outside the curated standard registry
+    let text = "Throughput reaches 50000 ops/s under RFC 9999 specifications.";
+
+    // Act
+    let report = ResearchGate::audit(text);
+
+    // Assert
+    assert!(report.has_research_deficit);
+    assert_eq!(report.claim_analyses[0].evidence_status, EvidenceStatus::EvidencePresent);
+    assert!(!report.claim_analyses[0].is_verified);
+    assert_eq!(report.verified_citations_count, 0);
+    assert_eq!(report.unverified_citations_count, 1);
+}
+
+#[test]
+fn test_bare_acronym_prose_marker_rejected() {
+    // Arrange: Bare "IEEE" and "ISO" mentions without standard numbers
+    let text = "Latency is 0.5ms as recommended by IEEE and ISO organizations.";
+
+    // Act
+    let report = ResearchGate::audit(text);
+
+    // Assert: Bare acronyms are not recognized as verified empirical standards
+    assert!(report.has_research_deficit);
+    assert_eq!(report.verified_citations_count, 0);
+}
+

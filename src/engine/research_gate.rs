@@ -86,6 +86,16 @@ const UNTRUSTED_OR_PLACEHOLDER_DOMAINS: &[&str] = &[
     "localhost",
 ];
 
+/// Curated registry of recognized, published IETF standard RFCs.
+pub const KNOWN_RFC_REGISTRY: &[u32] = &[
+    768, 791, 792, 793, 826, 854, 959, 1034, 1035, 1122, 1123, 1234, 1918, 2024,
+    2045, 2046, 2119, 2131, 2326, 2616, 2818, 2821, 2822, 3261, 3339, 3492, 3550,
+    3986, 4122, 4251, 4252, 4253, 4254, 4346, 4648, 5246, 5280, 5321, 5322, 5869,
+    6066, 6265, 6455, 6749, 6750, 7230, 7231, 7232, 7233, 7234, 7235, 7515, 7519,
+    7540, 7636, 8174, 8259, 8446, 9000, 9001, 9110, 9111, 9112, 9113, 9114, 9204,
+    9218, 9293, 9440,
+];
+
 pub struct ResearchGate;
 
 impl ResearchGate {
@@ -102,6 +112,68 @@ impl ResearchGate {
         } else {
             Some(host.to_string())
         }
+    }
+
+    /// Recognizes structured standard identifiers while rejecting bare acronym mentions.
+    pub fn match_structured_standard(lower: &str) -> Option<String> {
+        // Structured IEEE standards, e.g. "ieee 754", "ieee 802.11", "ieee standard"
+        if let Some(pos) = lower.find("ieee") {
+            let after = lower[pos + 4..].trim_start();
+            if after.starts_with(|c: char| c.is_ascii_digit()) {
+                let token: String = after
+                    .chars()
+                    .take_while(|c| c.is_alphanumeric() || *c == '.' || *c == '-')
+                    .collect();
+                return Some(format!("Recognized standard: IEEE {}", token));
+            } else if after.starts_with("standard") || after.starts_with("std") {
+                return Some("Recognized standard: IEEE Standard".to_string());
+            }
+        }
+
+        // Structured ISO / ISO/IEC standards, e.g. "iso/iec 27001", "iso 9001"
+        if let Some(pos) = lower.find("iso/iec") {
+            let after = lower[pos + 7..].trim_start();
+            if after.starts_with(|c: char| c.is_ascii_digit()) {
+                let token: String = after
+                    .chars()
+                    .take_while(|c| c.is_ascii_digit() || *c == '-')
+                    .collect();
+                return Some(format!("Recognized standard: ISO/IEC {}", token));
+            } else {
+                return Some("Recognized standard: ISO/IEC specification".to_string());
+            }
+        } else if let Some(pos) = lower.find("iso") {
+            let after = lower[pos + 3..].trim_start();
+            if after.starts_with(|c: char| c.is_ascii_digit()) {
+                let token: String = after
+                    .chars()
+                    .take_while(|c| c.is_ascii_digit() || *c == '-')
+                    .collect();
+                return Some(format!("Recognized standard: ISO {}", token));
+            }
+        }
+
+        // W3C recommendation or spec
+        if lower.contains("w3c recommendation")
+            || lower.contains("w3c spec")
+            || lower.contains("w3c standard")
+        {
+            return Some("Recognized standard: W3C Recommendation".to_string());
+        }
+
+        // ANSI standard
+        if let Some(pos) = lower.find("ansi") {
+            let after = lower[pos + 4..].trim_start_matches(|c: char| c == '/' || c.is_whitespace());
+            if after.starts_with(|c: char| c.is_ascii_digit() || c.is_alphabetic()) && after.len() >= 3 {
+                let token: String = after
+                    .chars()
+                    .take_while(|c| c.is_alphanumeric() || *c == '.' || *c == '-')
+                    .collect();
+                return Some(format!("Recognized standard: ANSI {}", token));
+            }
+        }
+
+        None
     }
 
     /// Evaluates evidence citations present in a specific sentence.
@@ -139,7 +211,7 @@ impl ResearchGate {
             }
         }
 
-        // 2. RFC check & valid number range validation
+        // 2. RFC check & curated registry validation
         if let Some(rfc_idx) = lower.find("rfc") {
             let after_rfc = &sentence[rfc_idx + 3..];
             let rfc_num_str: String = after_rfc
@@ -148,11 +220,11 @@ impl ResearchGate {
                 .take_while(|c| c.is_ascii_digit())
                 .collect();
             if let Ok(num) = rfc_num_str.parse::<u32>() {
-                if (1..=9999).contains(&num) {
+                if KNOWN_RFC_REGISTRY.binary_search(&num).is_ok() {
                     sources.push(format!("Verified IETF standard: RFC {}", num));
                     verified += 1;
                 } else {
-                    sources.push(format!("Invalid/unregistered RFC number: RFC {}", num));
+                    sources.push(format!("Uncataloged/unverified RFC number: RFC {}", num));
                     unverified += 1;
                 }
             }
@@ -185,17 +257,10 @@ impl ResearchGate {
             }
         }
 
-        // 5. Recognized standards body markers
-        const STANDARDS_ORGANIZATIONS: &[&str] = &[
-            "ieee", "iso/iec", "iso ", "w3c", "ansi",
-            "theo chuẩn ieee", "theo chuẩn iso",
-        ];
-        for &marker in STANDARDS_ORGANIZATIONS {
-            if lower.contains(marker) {
-                sources.push(format!("Recognized standards body: '{}'", marker.trim()));
-                verified += 1;
-                break;
-            }
+        // 5. Recognized structured standards markers (rejects bare acronym mentions)
+        if let Some(std_name) = Self::match_structured_standard(&lower) {
+            sources.push(std_name);
+            verified += 1;
         }
 
         // 6. Empirical test or benchmark execution logs
@@ -344,20 +409,31 @@ impl ResearchGate {
 
         let speculation_ratio = speculation_count as f64 / total_sentences as f64;
 
-        // Research deficit triggers if factual claims exist and verified citations are 0
-        let has_research_deficit = factual_claims_count >= 1 && total_verified == 0;
+        // Universal Grounding Axiom: Deficit triggers if ANY factual claim is unverified
+        let ungrounded_claims: Vec<String> = claim_analyses
+            .iter()
+            .filter(|c| !c.is_verified)
+            .map(|c| c.claim.clone())
+            .collect();
+        let has_research_deficit = !ungrounded_claims.is_empty();
+
+        let verified_claims_count = claim_analyses.iter().filter(|c| c.is_verified).count();
+        let claim_verification_ratio = if factual_claims_count == 0 {
+            1.0
+        } else {
+            verified_claims_count as f64 / factual_claims_count as f64
+        };
 
         let base_score = if factual_claims_count == 0 {
             95.0
         } else {
-            let verified_ratio = (total_verified as f64 / factual_claims_count as f64).clamp(0.0, 1.0);
-            (verified_ratio * 70.0 + (1.0 - speculation_ratio) * 30.0).clamp(0.0, 100.0)
+            (claim_verification_ratio * 70.0 + (1.0 - speculation_ratio) * 30.0).clamp(0.0, 100.0)
         };
 
         let research_score = if has_research_deficit {
-            base_score.min(40.0)
-        } else if total_unverified > 0 && total_verified == 0 {
-            base_score.min(55.0)
+            base_score.min(45.0)
+        } else if total_unverified > 0 {
+            base_score.min(60.0)
         } else {
             base_score
         };
@@ -398,7 +474,7 @@ impl ResearchGate {
             evidence_ratio,
             speculation_ratio,
             has_research_deficit,
-            unverified_claims: factual_claims,
+            unverified_claims: ungrounded_claims,
             detected_sources,
             claim_analyses,
             research_score,
@@ -446,6 +522,41 @@ mod tests {
         assert!(report.unverified_citations_count > 0);
         assert_eq!(report.claim_analyses[0].evidence_status, EvidenceStatus::EvidencePresent);
         assert!(!report.claim_analyses[0].is_verified);
+    }
+
+    #[test]
+    fn test_uncataloged_rfc_rejected() {
+        let text = "According to RFC 9999, throughput is 100000 ops/s.";
+        let report = ResearchGate::audit(text);
+        assert!(report.has_research_deficit);
+        assert!(report.unverified_citations_count > 0);
+        assert_eq!(report.claim_analyses[0].evidence_status, EvidenceStatus::EvidencePresent);
+        assert!(!report.claim_analyses[0].is_verified);
+    }
+
+    #[test]
+    fn test_bare_acronym_not_evidence() {
+        let text = "According to IEEE and ISO, latency is 10 ms.";
+        let report = ResearchGate::audit(text);
+        assert!(report.has_research_deficit);
+        assert_eq!(report.verified_citations_count, 0);
+    }
+
+    #[test]
+    fn test_structured_standard_verified() {
+        let text = "According to IEEE 754 and ISO/IEC 27001, version v1.0 is verified.";
+        let report = ResearchGate::audit(text);
+        assert!(!report.has_research_deficit);
+        assert!(report.verified_citations_count >= 2);
+    }
+
+    #[test]
+    fn test_mixed_claims_triggers_deficit() {
+        let text = "According to https://docs.rs/serde, version v1.0 is stable.\nMeanwhile latency of v2.0 is 0.01ms as per RFC 9999.";
+        let report = ResearchGate::audit(text);
+        assert!(report.has_research_deficit);
+        assert_eq!(report.verdict, "RESEARCH_DEFICIT");
+        assert_eq!(report.unverified_claims.len(), 1);
     }
 
     #[test]
