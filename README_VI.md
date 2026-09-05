@@ -1,13 +1,26 @@
-# 🛡️ AI Verification MCP: Tầng Quản Trị & Kiểm Toán Tác Tử AI Tất Định
+# 🛡️ AI Verification MCP: Tầng Thực Thi Chính Sách & Bằng Chứng Tất Định Cho AI Agent
 
 [English](README.md) | [Tiếng Việt](README_VI.md)
 
 [![Rust CI/CD](https://github.com/Nhan-209/mcp-plugin-math/actions/workflows/ci.yml/badge.svg)](https://github.com/Nhan-209/mcp-plugin-math/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Protocol: MCP 2024-11-05](https://img.shields.io/badge/MCP-2024--11--05-brightgreen.svg)](https://modelcontextprotocol.io)
-[![Version: 0.6.0](https://img.shields.io/badge/version-0.6.0-orange.svg)](Cargo.toml)
+[![Version: 0.8.0](https://img.shields.io/badge/version-0.8.0-orange.svg)](Cargo.toml)
 
-Một **Model Context Protocol (MCP)** Server hiệu năng cực cao viết bằng **Rust**, đóng vai trò là **Tầng Quản Trị & Kiểm Toán (Verification & Governance Layer)** cho các hệ thống AI Agent. Dự án chuyển hóa các tín hiệu tất định và phân tích tĩnh thành các rào chắn kỹ thuật (guardrails), áp dụng cơ chế phán quyết 4 cấp (**`ALLOW`**, **`WARN`**, **`BLOCK`**, **`INSUFFICIENT_EVIDENCE`**) với mã vi phạm chuẩn hóa và kế hoạch khắc phục hành động cụ thể (actionable remediation).
+Một **Model Context Protocol (MCP)** Server hiệu năng cực cao viết bằng **Rust**, đóng vai trò là **Tầng Thực Thi Chính Sách & Bằng Chứng Tất Định (Deterministic Evidence & Policy Enforcement Layer)** cho các hệ thống AI Agent. Dự án chuyển hóa các tín hiệu tất định, phân tích cú pháp AST và danh mục nguồn dẫn uy tín thành các rào chắn kỹ thuật (guardrails), áp dụng cơ chế phán quyết 4 cấp (**`ALLOW`**, **`WARN`**, **`BLOCK`**, **`INSUFFICIENT_EVIDENCE`**) với mã vi phạm chuẩn hóa và kế hoạch khắc phục hành động cụ thể (actionable remediation).
+
+---
+
+## ⚖️ Mô Hình Tin Cậy & Biên Giới Cam Kết (Trust Model & Epistemic Boundaries)
+
+`ai-verification-mcp` vận hành dưới một mô hình tin cậy toán học rõ ràng và có biên giới giới hạn:
+$$\text{ALLOW} \equiv \text{Không phát hiện vi phạm chính sách trong phạm vi bằng chứng đã khai báo}$$
+$$\text{ALLOW} \not\equiv \text{Bằng chứng thực nghiệm rằng AI là toàn tri hay không thể mắc lỗi}$$
+
+Hệ thống loại bỏ hoàn toàn sự phụ thuộc vào các mô hình "LLM-as-a-judge" cảm tính bằng cách áp đặt **các bất biến tất định (hard deterministic invariants)**:
+1. **Tiên đề Dẫn chứng Toàn diện (Universal Grounding Axiom)**: Nếu AI đưa ra các luận điểm kỹ thuật cụ thể, từng luận điểm đều phải có nguồn trích dẫn được xác thực. Dẫn chứng hợp lệ cho Luận điểm A không thể dùng để bảo kê cho Luận điểm B không có bằng chứng.
+2. **Ma trận Bằng chứng Bắt buộc (Mandatory Evidence Matrix)**: Payload khuyết thiếu không thể gian lận điểm số. Ở chế độ `standard`, việc thiếu hợp đồng (`user_requirements` hoặc `planned_tasks`) bắt buộc trả về `INSUFFICIENT_EVIDENCE`. Ở chế độ `deep`, việc thiếu bất kỳ trụ cột nào sẽ dẫn đến `BLOCK`.
+3. **Danh Mục Tiêu Chuẩn Chuẩn Hóa (`KNOWN_RFC_REGISTRY`)**: Loại bỏ việc chấp nhận dải số ngẫu nhiên. Số hiệu RFC phải đối chiếu với `KNOWN_RFC_REGISTRY` và các tổ chức tiêu chuẩn phải đi kèm mã định danh cấu trúc (`IEEE 754`, `ISO/IEC 27001`).
 
 ---
 
@@ -52,9 +65,9 @@ Kế hoạch thực thi được mô hình hóa thành Đồ thị Có hướng 
 ### 3. Cổng Nghiên Cứu Thực Nghiệm & Vòng Đời Dẫn Chứng 3 Cấp
 - **Quy Trình Xác Thực Dẫn Chứng 3 Cấp**:
   $$\text{Unsupported} \longrightarrow \text{EvidencePresent} \longrightarrow \text{EvidenceVerified}$$
-  Kiểm tra số hiệu RFC hợp lệ ($1 \le \text{RFC} \le 9999$), domain uy tín (`docs.rs`, `ietf.org`, `crates.io`, `github.com`), đường dẫn file nội bộ; từ chối domain giữ chỗ (`example.com`, `fake.example`).
+  Kiểm tra số hiệu RFC đối chiếu với `KNOWN_RFC_REGISTRY`, domain uy tín (`docs.rs`, `ietf.org`, `crates.io`, `github.com`), đường dẫn file nội bộ, và tiêu chuẩn có cấu trúc (`IEEE 754`, `ISO/IEC 27001`); từ chối domain giữ chỗ (`example.com`) và RFC chưa phân loại.
 - **Chẩn Đoán Khẳng Định Kỹ Thuật**: Phân loại khẳng định theo nhóm (hiệu năng benchmark, phiên bản đặc tả, tính tương thích API).
-- **Cảnh Báo Thiếu Hụt Nghiên Cứu (`RESEARCH_DEFICIT`)**: Buộc AI phải trích dẫn tài liệu uy tín trước khi đưa ra kết luận.
+- **Thực Thi Tiên Đề Dẫn Chứng Toàn Diện**: Bất kỳ khẳng định nào thiếu dẫn chứng đều kích hoạt `RESEARCH_DEFICIT` (Critical) và chặn bàn giao.
 
 ### 4. Lý Thuyết Thông Tin & Tách Câu Thông Minh
 - **Shannon Entropy**:
@@ -84,10 +97,10 @@ Cổng kiểm toán tổng hợp (`verify_agent`) đưa ra quyết định quả
 
 | Quyết Định | Điều Kiện | Hành Vi Của Agent |
 |:---:|---|---|
-| **`ALLOW`** | Không có vi phạm nghiêm trọng (Critical), điểm tuân thủ chính sách $\ge 75\%$. | Được phép tiến hành / bàn giao kết quả. |
-| **`WARN`** | Không có vi phạm nghiêm trọng, nhưng có cảnh báo (ví dụ câu hơi dài, làm việc ngoài kế hoạch nhẹ, hoặc điểm $50-75\%$). | Được phép tiến hành nhưng nên lưu ý khuyến nghị. |
-| **`BLOCK`** | Có vi phạm nghiêm trọng (lỗi cú pháp AST, sai thứ tự DAG, thiếu nghiên cứu, tự tin thái quá, thiếu yêu cầu) hoặc điểm $< 50\%$. | Dừng thực thi ngay lập tức; AI bắt buộc phải khắc phục theo `remediation_plan` trước khi tiếp tục. |
-| **`INSUFFICIENT_EVIDENCE`** | Payload trống rỗng hoặc không có dữ liệu thực thi để kiểm toán (điểm policy = 0.0, verdict = "UNVERIFIED"). | Chưa thực hiện kiểm toán; AI cần cung cấp kế hoạch, code hoặc dẫn chứng cụ thể. |
+| **`ALLOW`** | Đầy đủ bằng chứng bắt buộc, 0 vi phạm Critical, 0 vi phạm Warning, điểm chính sách $\ge 75\%$. | Được phép tiến hành / bàn giao kết quả. |
+| **`WARN`** | Đầy đủ bằng chứng bắt buộc, không có vi phạm Critical, nhưng có cảnh báo Warning (hoặc điểm $50-75\%$). | Được phép tiến hành nhưng nên lưu ý khuyến nghị. |
+| **`BLOCK`** | Có bất kỳ vi phạm nghiêm trọng nào (lỗi cú pháp, sai thứ tự DAG, luận điểm thiếu nguồn, tự tin thái quá, thiếu yêu cầu) hoặc điểm $< 50\%$. | Dừng thực thi ngay lập tức; AI bắt buộc phải khắc phục theo `remediation_plan` trước khi tiếp tục. |
+| **`INSUFFICIENT_EVIDENCE`** | Payload trống rỗng hoặc thiếu hợp đồng bắt buộc (ví dụ: chỉ gửi văn bản nháp ở chế độ `standard` mà không có yêu cầu hay kế hoạch). | Chưa đủ bằng chứng để kiểm toán; AI cần cung cấp hợp đồng yêu cầu hoặc kế hoạch cụ thể. |
 
 ### Cấu Trúc Vi Phạm Chuẩn Hóa
 

@@ -375,14 +375,18 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
         if let Some(ref text) = input.draft_response {
             let r_rep = ResearchGate::audit(text);
             if r_rep.has_research_deficit {
+                let ungrounded_count = r_rep.unverified_claims.len();
                 add_violation(
                     &mut violations,
                     &mut critical_violations,
                     &mut recommendations,
                     "RESEARCH_DEFICIT",
-                    "Research Deficit: Factual technical assertions made without citations. Verify with docs, RFCs, or test logs.".to_string(),
+                    format!(
+                        "Research Deficit: {} factual technical claim(s) lack verified citations (RFC/docs/test logs): {:?}",
+                        ungrounded_count, r_rep.unverified_claims
+                    ),
                     ViolationSeverity::Critical,
-                    "Ground factual claims with official documentation links, RFCs, or benchmark citations.",
+                    "Ground every factual claim with official documentation links, RFCs, or benchmark citations.",
                 );
             }
             for rec in &r_rep.recommendations {
@@ -532,6 +536,31 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
         );
     }
 
+    let mandatory_contract_met = match mode_str.as_str() {
+        "quick" => has_any_input,
+        "deep" => !input.user_requirements.is_empty() && !input.planned_tasks.is_empty(),
+        _ => !input.user_requirements.is_empty() || !input.planned_tasks.is_empty(),
+    };
+
+    if !is_quick && !mandatory_contract_met && has_any_input {
+        add_violation(
+            &mut violations,
+            &mut critical_violations,
+            &mut recommendations,
+            "CONTRACT_EVIDENCE_MISSING",
+            format!(
+                "{} Mode Invariant: Verification requires formal user_requirements or planned_tasks. Isolated response alone cannot receive ALLOW.",
+                if is_deep { "Deep" } else { "Standard" }
+            ),
+            if is_deep {
+                ViolationSeverity::Critical
+            } else {
+                ViolationSeverity::Warning
+            },
+            "Provide user_requirements or planned_tasks to substantiate task compliance.",
+        );
+    }
+
     let policy_score = if !has_any_input || weighted_scores.is_empty() {
         0.0
     } else {
@@ -566,7 +595,7 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
 
     let (decision, verdict) = if critical_count > 0 {
         ("BLOCK".to_string(), "FAIL".to_string())
-    } else if !has_any_input || weighted_scores.is_empty() {
+    } else if !has_any_input || weighted_scores.is_empty() || !mandatory_contract_met {
         (
             "INSUFFICIENT_EVIDENCE".to_string(),
             "UNVERIFIED".to_string(),
@@ -706,6 +735,21 @@ mod tests {
         assert_eq!(val["decision"], "WARN");
         assert_eq!(val["verdict"], "WARN");
         assert!(val["severity_summary"]["warning"].as_u64().unwrap() > 0);
+    }
+
+    #[test]
+    fn test_unified_audit_score_gaming_rejected() {
+        let args = json!({
+            "draft_response": "According to docs.rs and RFC 2119, everything is implemented with high confidence and verified citations. See: https://docs.rs/serde"
+        });
+        let result = execute_unified_audit(args);
+        assert!(result.is_ok());
+        let val = result.unwrap();
+        // Standard mode invariant: Isolated draft response cannot receive ALLOW
+        assert_eq!(val["decision"], "INSUFFICIENT_EVIDENCE");
+        assert_eq!(val["verdict"], "UNVERIFIED");
+        let violations = val["violations"].as_array().unwrap();
+        assert!(violations.iter().any(|v| v["code"] == "CONTRACT_EVIDENCE_MISSING"));
     }
 
     #[test]

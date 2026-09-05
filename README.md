@@ -1,13 +1,26 @@
-# 🛡️ AI Verification MCP: AI Agent Verification & Governance Layer
+# 🛡️ AI Verification MCP: Deterministic Evidence & Policy Enforcement Layer for AI Agents
 
 [English](README.md) | [Tiếng Việt](README_VI.md)
 
 [![Rust CI/CD](https://github.com/Nhan-209/mcp-plugin-math/actions/workflows/ci.yml/badge.svg)](https://github.com/Nhan-209/mcp-plugin-math/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Protocol: MCP 2024-11-05](https://img.shields.io/badge/MCP-2024--11--05-brightgreen.svg)](https://modelcontextprotocol.io)
-[![Version: 0.6.0](https://img.shields.io/badge/version-0.6.0-orange.svg)](Cargo.toml)
+[![Version: 0.8.0](https://img.shields.io/badge/version-0.8.0-orange.svg)](Cargo.toml)
 
-An ultra-high-performance **Model Context Protocol (MCP)** Server written in **Rust** that serves as an **AI Agent Verification & Governance Layer**. It evaluates proposed AI actions, plans, diffs, and draft responses against deterministic signals and static analysis, enforcing 4-tier governance decisions (**`ALLOW`**, **`WARN`**, **`BLOCK`**, **`INSUFFICIENT_EVIDENCE`**) with machine-readable violation codes and actionable remediation advice.
+An ultra-high-performance **Model Context Protocol (MCP)** Server written in **Rust** that serves as a **Deterministic Evidence & Policy Enforcement Layer for AI Agents**. It evaluates proposed AI actions, plans, diffs, and draft responses against deterministic signals, AST analysis, and curated provenance registries, enforcing 4-tier governance decisions (**`ALLOW`**, **`WARN`**, **`BLOCK`**, **`INSUFFICIENT_EVIDENCE`**) with machine-readable violation codes and actionable remediation advice.
+
+---
+
+## ⚖️ Trust Model & Epistemic Boundaries
+
+`ai-verification-mcp` operates under a formal, bounded trust model:
+$$\text{ALLOW} \equiv \text{No policy violation detected under declared evidence policy}$$
+$$\text{ALLOW} \not\equiv \text{Empirical proof that the AI is omniscient or infallible}$$
+
+The verifier eliminates reliance on subjective LLM-as-a-judge patterns by executing **hard deterministic invariants**:
+1. **Universal Grounding Axiom**: If an agent makes factual technical claims, every single claim must have verified provenance. A valid citation for Claim A cannot launder ungrounded Claim B.
+2. **Mandatory Evidence Matrix**: Partial input payloads cannot game numerical scores. In `standard` mode, omission of contracts (`user_requirements` or `planned_tasks`) yields `INSUFFICIENT_EVIDENCE`. In `deep` mode, omitting any pillar triggers `BLOCK`.
+3. **Curated Standards Registry**: Permissive numeric ranges are eliminated. RFCs are validated against `KNOWN_RFC_REGISTRY` and standard bodies require structured identifiers (`IEEE 754`, `ISO/IEC 27001`).
 
 ---
 
@@ -52,9 +65,9 @@ Execution plans are modeled as a DAG $G = (V, E)$.
 ### 3. Empirical Research Gate & 3-Tier Evidence Lifecycle
 - **3-Tier Evidence Verification**: Classifies citations through a deterministic verification pipeline:
   $$\text{Unsupported} \longrightarrow \text{EvidencePresent} \longrightarrow \text{EvidenceVerified}$$
-  Validates RFC numbers ($1 \le \text{RFC} \le 9999$), authoritative registries (`docs.rs`, `ietf.org`, `crates.io`, `github.com`), and local filesystem paths. Rejects placeholder URLs (`example.com`, `fake.example`).
+  Validates RFC numbers against `KNOWN_RFC_REGISTRY`, authoritative registries (`docs.rs`, `ietf.org`, `crates.io`, `github.com`), local filesystem paths, and structured standards (`IEEE 754`, `ISO/IEC 27001`). Rejects placeholder URLs (`example.com`) and uncataloged RFC numbers.
 - **Claim Diagnostics**: Analyzes technical claims across categories (performance benchmarks, version specs, API contracts).
-- **Research Deficit Detection**: Unverified claims trigger a `RESEARCH_DEFICIT` violation with targeted remediation instructions.
+- **Universal Grounding Enforcement**: Any unverified claim triggers `RESEARCH_DEFICIT` (Critical) and blocks delivery.
 
 ### 4. Information Theory & Smart Linguistic Density
 - **Shannon Entropy**:
@@ -84,10 +97,10 @@ The unified governance gate (`verify_agent`) evaluates all active pillars and ou
 
 | Decision | Criteria | Agent Behavior |
 |:---:|---|---|
-| **`ALLOW`** | No critical violations, policy score $\ge 75\%$. | Safe to proceed / deliver response. |
-| **`WARN`** | No critical violations, but warnings present (e.g. slight verbosity, minor scope waste, or score $50-75\%$). | Agent may proceed but should review suggestions. |
-| **`BLOCK`** | Any critical violation (syntax error, broken DAG order, research deficit, uncalibrated overconfidence, constraint omission) or score $< 50\%$. | Execution halted; agent must apply remediation before retry. |
-| **`INSUFFICIENT_EVIDENCE`** | Empty payload or zero verifiable claims provided (policy score = 0.0, verdict = "UNVERIFIED"). | Verification unperformed; agent must provide actionable plan, code, or claims. |
+| **`ALLOW`** | All mandatory evidence satisfied, zero critical violations, zero warnings, policy score $\ge 75\%$. | Safe to proceed / deliver response. |
+| **`WARN`** | All mandatory evidence satisfied, no critical violations, but warnings present (e.g. slight verbosity, minor scope waste, or score $50-75\%$). | Agent may proceed but should review suggestions. |
+| **`BLOCK`** | Any critical violation (syntax error, broken DAG order, ungrounded claim, uncalibrated overconfidence, constraint omission) or score $< 50\%$. | Execution halted; agent must apply remediation before retry. |
+| **`INSUFFICIENT_EVIDENCE`** | Empty payload or missing mandatory contract (e.g. isolated draft response in `standard` mode without requirements or plan). | Verification blocked; agent must provide actionable contract specifications or execution trace. |
 
 ### Structured Violation Format
 

@@ -162,13 +162,16 @@ fn test_governance_benchmark_recall_ungrounded() {
     ];
 
     let total = ungrounded_cases.len();
-    let mut caught_count = 0;
+    let mut rejected_count = 0;
 
     for (idx, case) in ungrounded_cases.into_iter().enumerate() {
         let res = execute_unified_audit(case).expect("Audit execution failed");
         let decision = res["decision"].as_str().unwrap();
-        if decision == "BLOCK" || decision == "WARN" {
-            caught_count += 1;
+        // INSUFFICIENT_EVIDENCE is a valid rejection: the engine correctly refused
+        // to pass a payload that lacks the mandatory evidence contract (no
+        // user_requirements or planned_tasks), which is what case #9 triggers.
+        if decision == "BLOCK" || decision == "WARN" || decision == "INSUFFICIENT_EVIDENCE" {
+            rejected_count += 1;
         } else {
             eprintln!(
                 "Ungrounded case #{} escaped detection with ALLOW: {:?}",
@@ -178,10 +181,10 @@ fn test_governance_benchmark_recall_ungrounded() {
         }
     }
 
-    let recall = caught_count as f64 / total as f64;
+    let recall = rejected_count as f64 / total as f64;
     assert_eq!(
         recall, 1.0,
-        "Recall benchmark failed: Expected 100% BLOCK/WARN for ungrounded cases, got {:.1}%",
+        "Recall benchmark failed: Expected 100% rejection (BLOCK/WARN/INSUFFICIENT_EVIDENCE) for ungrounded cases, got {:.1}%",
         recall * 100.0
     );
 }
