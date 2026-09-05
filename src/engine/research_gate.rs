@@ -1,6 +1,6 @@
 //! Research Gate Engine: Forces AI to cite empirical evidence and verify claims before delivering output.
 
-use crate::engine::text_utils::{smart_split_sentences, EVIDENCE_MARKERS, HEDGING_PHRASES};
+use crate::engine::text_utils::{smart_split_sentences, HEDGING_PHRASES};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
 
@@ -173,13 +173,26 @@ impl ResearchGate {
             verified += 1;
         }
 
-        // 5. Standard evidence markers
-        for &marker in EVIDENCE_MARKERS {
-            if lower.contains(marker) && !marker.eq_ignore_ascii_case("rfc") {
-                sources.push(format!("Evidence marker: '{}'", marker));
+        // 5. Recognized standards body markers
+        const STANDARDS_ORGANIZATIONS: &[&str] = &[
+            "ieee", "iso/iec", "iso ", "w3c", "ansi",
+            "theo chuẩn ieee", "theo chuẩn iso",
+        ];
+        for &marker in STANDARDS_ORGANIZATIONS {
+            if lower.contains(marker) {
+                sources.push(format!("Recognized standards body: '{}'", marker.trim()));
                 verified += 1;
                 break;
             }
+        }
+
+        // 6. Empirical test or benchmark execution logs
+        if (lower.contains("test result:") && lower.contains("ok"))
+            || lower.contains("benchmark logs")
+            || lower.contains("test coverage")
+        {
+            sources.push("Empirical execution or benchmark log".to_string());
+            verified += 1;
         }
 
         (sources, verified, unverified)
@@ -248,10 +261,10 @@ impl ResearchGate {
                     "API_COMPATIBILITY"
                 };
 
-                let evidence_status = if v_count > 0 {
-                    EvidenceStatus::EvidenceVerified
-                } else if unv_count > 0 {
+                let evidence_status = if unv_count > 0 {
                     EvidenceStatus::EvidencePresent
+                } else if v_count > 0 {
+                    EvidenceStatus::EvidenceVerified
                 } else {
                     EvidenceStatus::Unsupported
                 };

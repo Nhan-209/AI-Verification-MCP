@@ -143,7 +143,7 @@ impl ConstraintEngine {
             matched_count == 1
         };
 
-        (key_match && (jaccard >= 0.35 || word_overlap >= 0.40)) || jaccard >= 0.65 || word_overlap >= 0.70
+        key_match || jaccard >= 0.25 || word_overlap >= 0.50
     }
 
     fn char_ngram_jaccard(a: &str, b: &str, n: usize) -> f64 {
