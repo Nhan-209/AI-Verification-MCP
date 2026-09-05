@@ -111,14 +111,26 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
 
     // 1. Constraint Verification (Standard: 0.30, Quick: 0.50)
     let constraint_report = if !input.user_requirements.is_empty() {
-        let mut impl_claims: Vec<String> = input.executed_steps.clone();
+        let mut impl_claims: Vec<String> = Vec::new();
+        let known_ids: std::collections::HashSet<&str> =
+            input.planned_tasks.iter().map(|t| t.id.as_str()).collect();
+
         for task in &input.planned_tasks {
             if input.executed_steps.contains(&task.id) {
                 impl_claims.push(task.name.clone());
             }
         }
-        if let Some(ref text) = input.draft_response {
-            impl_claims.push(text.clone());
+
+        for step in &input.executed_steps {
+            if !known_ids.contains(step.as_str()) && !PlanDag::is_exploratory_action(step) {
+                impl_claims.push(step.clone());
+            }
+        }
+
+        if impl_claims.is_empty() {
+            if let Some(ref text) = input.draft_response {
+                impl_claims.push(text.clone());
+            }
         }
         let rep = ConstraintEngine::verify(&input.user_requirements, &impl_claims);
 
@@ -186,20 +198,32 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
 
         for step in &input.executed_steps {
             if let Err(err) = dag.record_step(step) {
-                add_violation(
-                    &mut violations,
-                    &mut critical_violations,
-                    &mut recommendations,
-                    "PLAN_DEPENDENCY_ERROR",
-                    err,
-                    ViolationSeverity::Critical,
-                    "Reorder tasks according to DAG topological dependencies.",
-                );
+                if err.contains("Dependency violation") {
+                    add_violation(
+                        &mut violations,
+                        &mut critical_violations,
+                        &mut recommendations,
+                        "PLAN_DEPENDENCY_ERROR",
+                        err,
+                        ViolationSeverity::Critical,
+                        "Reorder tasks according to DAG topological dependencies.",
+                    );
+                } else {
+                    add_violation(
+                        &mut violations,
+                        &mut critical_violations,
+                        &mut recommendations,
+                        "SCOPE_CREEP",
+                        err,
+                        ViolationSeverity::Warning,
+                        "Register unplanned tasks into plan DAG or remove extraneous execution steps.",
+                    );
+                }
             }
         }
 
         let metrics = dag.evaluate_metrics();
-        if metrics.scope_creep_count > 0 {
+        if metrics.scope_creep_count > 0 && !violations.iter().any(|v| v.code == "SCOPE_CREEP") {
             add_violation(
                 &mut violations,
                 &mut critical_violations,
@@ -595,7 +619,7 @@ mod tests {
             "mode": "quick",
             "user_requirements": ["must be fast"],
             "executed_steps": ["must be fast"],
-            "draft_response": "Execution is verified by tests."
+            "draft_response": "Execution is verified by tests in tests/bench.rs."
         });
         let result = execute_unified_audit(args);
         assert!(result.is_ok());

@@ -46,6 +46,10 @@ impl ConstraintEngine {
 
         let mut scope_creep = Vec::new();
         for imp in &impl_set {
+            // Ignore long descriptive sentences or paragraphs from being flagged as action scope creep
+            if imp.len() > 60 || imp.split_whitespace().count() > 8 {
+                continue;
+            }
             let is_demanded = req_set
                 .iter()
                 .any(|req| Self::is_semantically_matched(req, imp));
