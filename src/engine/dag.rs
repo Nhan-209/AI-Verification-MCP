@@ -141,33 +141,33 @@ impl PlanDag {
                     }
                 }
             }
+
+            // Commit planned task step only after dependency validation passes
+            self.execution_log.push(task_id.to_string());
+            if let Some(task) = self.tasks.get_mut(task_id) {
+                task.status = TaskStatus::Completed;
+            }
+
+            Ok(format!(
+                "Task '{}' executed successfully within planned DAG",
+                task_id
+            ))
         } else {
-            // Unplanned action: distinguish justified exploration from actual scope creep
+            // Unplanned action: record step in execution trace for audit/waste tracking
+            self.execution_log.push(task_id.to_string());
+
             if Self::is_exploratory_action(task_id) {
-                // Commit exploratory discovery step
-                self.execution_log.push(task_id.to_string());
-                return Ok(format!(
+                Ok(format!(
                     "Justified discovery step '{}' recorded (exploratory action outside plan DAG)",
                     task_id
-                ));
+                ))
             } else {
-                return Err(format!(
+                Err(format!(
                     "Scope creep violation: Task '{}' was executed but not present in approved plan DAG",
                     task_id
-                ));
+                ))
             }
         }
-
-        // Commit planned task step only after dependency validation passes
-        self.execution_log.push(task_id.to_string());
-        if let Some(task) = self.tasks.get_mut(task_id) {
-            task.status = TaskStatus::Completed;
-        }
-
-        Ok(format!(
-            "Task '{}' executed successfully within planned DAG",
-            task_id
-        ))
     }
 
     /// Computes formal graph metrics: Coverage (C) and Waste/Scope Creep (W).
