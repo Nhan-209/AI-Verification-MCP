@@ -5,7 +5,7 @@
 [![Rust CI/CD](https://github.com/Nhan-209/mcp-plugin-math/actions/workflows/ci.yml/badge.svg)](https://github.com/Nhan-209/mcp-plugin-math/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Protocol: MCP 2024-11-05](https://img.shields.io/badge/MCP-2024--11--05-brightgreen.svg)](https://modelcontextprotocol.io)
-[![Version: 0.8.0](https://img.shields.io/badge/version-0.8.0-orange.svg)](Cargo.toml)
+[![Version: 0.9.0](https://img.shields.io/badge/version-0.9.0-orange.svg)](Cargo.toml)
 
 Một **Model Context Protocol (MCP)** Server hiệu năng cực cao viết bằng **Rust**, đóng vai trò là **Tầng Thực Thi Chính Sách & Bằng Chứng Tất Định (Deterministic Evidence & Policy Enforcement Layer)** cho các hệ thống AI Agent. Dự án chuyển hóa các tín hiệu tất định, phân tích cú pháp AST và danh mục nguồn dẫn uy tín thành các rào chắn kỹ thuật (guardrails), áp dụng cơ chế phán quyết 4 cấp (**`ALLOW`**, **`WARN`**, **`BLOCK`**, **`INSUFFICIENT_EVIDENCE`**) với mã vi phạm chuẩn hóa và kế hoạch khắc phục hành động cụ thể (actionable remediation).
 
@@ -141,14 +141,14 @@ Toàn bộ công cụ hỗ trợ 100% bí danh ngược (backward-compatible) ch
 
 | Tên Công Cụ Chính | Bí Danh Kế Thừa | Loại | Mô Tả |
 |---|---|---|---|
-| **`verify_agent`** | `math_audit_cognition`, `ai_audit_cognition` | **Cổng Tổng Hợp** | Kiểm toán toàn diện 6 trụ cột. Trả về phán quyết 3 cấp (`ALLOW`/`WARN`/`BLOCK`), danh sách vi phạm và kế hoạch khắc phục. Hỗ trợ 3 chế độ `quick`, `standard`, `deep`. |
-| **`verify_dag`** | `math_track_dag` | Chẩn Đoán | Theo dõi tiến trình DAG. Bắt lỗi chu trình, sai thứ tự tô pô và hỗ trợ phân loại khám phá hợp lệ. |
-| **`verify_code`** | `math_eval_code` | Chẩn Đoán | Phân tích AST qua Tree-sitter, McCabe Cyclomatic, Halstead, Maintainability Index và cảnh báo biên cho 7 ngôn ngữ. |
+| **`verify_agent`** | `math_audit_cognition`, `ai_audit_cognition` | **Cổng Tổng Hợp** | Kiểm toán toàn diện 6 trụ cột. Trả về **phán quyết 4 cấp** (`ALLOW`/`WARN`/`BLOCK`/`INSUFFICIENT_EVIDENCE`), danh sách vi phạm và kế hoạch khắc phục. Hỗ trợ 3 chế độ `quick`, `standard`, `deep` và tham số `audit_phase` (`plan`/`execution`). |
+| **`verify_dag`** | `math_track_dag` | Chẩn Đoán | Theo dõi tiến trình DAG. Bắt lỗi chu trình, tham chiếu dependency không tồn tại, trùng lặp mã task và phân loại khám phá hợp lệ. |
+| **`verify_code`** | `math_eval_code` | Chẩn Đoán | Phân tích AST qua Tree-sitter, McCabe Cyclomatic, Halstead xấp xỉ, Maintainability Index và cảnh báo biên cho 7 ngôn ngữ. |
 | **`verify_diff`** | `math_eval_diff` | Chẩn Đoán | Phân tích diff bằng LCS, tính toán tỷ lệ thay đổi, biến thiên độ phức tạp ($\Delta M$, $\Delta\text{MI}$), hàm bị ảnh hưởng và rủi ro hồi quy. |
 | **`verify_text`** | `math_eval_text` | Chẩn Đoán | Đo lường Shannon entropy, mật độ thông tin, tỷ lệ nén, chỉ số khả năng đọc và phát hiện từ đệm AI. |
 | **`verify_confidence`** | `math_confidence` | Chẩn Đoán | Hiệu chuẩn nhận thức. Bắt lỗi tự tin thái quá đồng thời công nhận các khẳng định chỉ số thực nghiệm và hợp đồng đặc tả. |
-| **`verify_research`** | `math_audit_research` | Chẩn Đoán | Rà soát khẳng định kỹ thuật (benchmark, phiên bản, API), kiểm tra dẫn chứng (RFC, URL, log) và cảnh báo thiếu hụt nghiên cứu. |
-| **`verify_foresight`** | `math_eval_foresight` | Chẩn Đoán | Đánh giá thiết kế phòng thủ, ca biên, chiến lược kiểm thử và cảnh báo kế hoạch sơ sài. |
+| **`verify_research`** | `math_audit_research` | Chẩn Đoán | Rà soát khẳng định kỹ thuật (benchmark, phiên bản, API), kiểm tra RFC đối chiếu với danh mục chuẩn hóa 70+ RFC thực tế và tên miền xác thực. |
+| **`verify_foresight`** | `math_eval_foresight` | Chẩn Đoán | Đánh giá văn phong dự liệu phòng thủ, ca biên, chiến lược kiểm thử và cảnh báo kế hoạch sơ sài. |
 | **`verify_constraints`** | `math_verify_constraints` | Chẩn Đoán | Đối soát yêu cầu với giải pháp thực tế bằng n-gram Jaccard và phát hiện mâu thuẫn phủ định động. |
 
 ---
