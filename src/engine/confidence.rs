@@ -95,6 +95,10 @@ impl ConfidenceAnalyzer {
         }
 
         for word in &words {
+            let clean_word = word.trim_matches(|c: char| !c.is_alphanumeric() && c != '/' && c != '\\' && c != '.');
+            if clean_word == "100" || clean_word == "100%" {
+                continue;
+            }
             if word.chars().any(|c| c.is_ascii_digit())
                 || ((word.contains('/') || word.contains('\\')) && word.contains('.'))
                 || word.starts_with("http://")
@@ -117,6 +121,15 @@ impl ConfidenceAnalyzer {
             0.0
         };
 
+        let has_hard_evidence = trimmed.contains("```")
+            || trimmed.contains("http://")
+            || trimmed.contains("https://")
+            || trimmed.contains(".rs")
+            || trimmed.contains(".ts")
+            || trimmed.contains(".py")
+            || trimmed.contains(".toml")
+            || (trimmed.contains('/') && (trimmed.contains("/var") || trimmed.contains("/etc") || trimmed.contains("/usr") || trimmed.contains("/home") || trimmed.contains("/path")));
+
         // 3. Overconfidence & Absolute Claim detection (Bilingual EN/VI)
         let mut overconfidence_count: f64 = 0.0;
         let mut unverified_claims = Vec::new();
@@ -126,7 +139,7 @@ impl ConfidenceAnalyzer {
             for &abs_phrase in OVERCONFIDENCE_PHRASES {
                 if lower_sentence.contains(abs_phrase) {
                     overconfidence_count += 1.0;
-                    if specificity < 0.4 {
+                    if !has_hard_evidence {
                         unverified_claims.push(format!(
                             "Absolute assertion '{}' made without empirical evidence: \"{}\"",
                             abs_phrase, sentence.trim()
@@ -206,7 +219,12 @@ impl ConfidenceAnalyzer {
             + 0.10 * (1.0 - filler_penalty))
             .clamp(0.0, 1.0);
 
-        let overconfidence_penalty = (overconfidence_score * 0.4).min(0.4);
+        let overconfidence_penalty = if !has_hard_evidence && overconfidence_count > 0.0 {
+            (overconfidence_score * 0.5 + 0.2).min(0.6)
+        } else {
+            (overconfidence_score * 0.2).min(0.2)
+        };
+
         let excessive_hedging_penalty = if hedging_ratio > 0.35 {
             (hedging_ratio - 0.35) * 0.4
         } else {
@@ -217,11 +235,11 @@ impl ConfidenceAnalyzer {
             .clamp(0.0, 1.0);
 
         // 7. Epistemic Verdict
-        let verdict = if overconfidence_score > 0.2 && specificity < 0.4 {
+        let verdict = if overconfidence_count > 0.0 && !has_hard_evidence {
             "OVERCONFIDENT".to_string()
         } else if hedging_ratio > 0.45 && specificity < 0.3 {
             "EVASIVE".to_string()
-        } else if hedging_ratio > 0.45 && specificity >= 0.4 {
+        } else if hedging_ratio > 0.45 && (specificity >= 0.3 || has_hard_evidence) {
             "UNDERCONFIDENT".to_string()
         } else {
             "CALIBRATED".to_string()
