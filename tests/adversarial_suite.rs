@@ -175,7 +175,7 @@ fn test_domain_spoofing_attacker_url_rejected() {
 
 #[test]
 fn test_nonexistent_local_file_rejected() {
-    let text = "Implementation validated in src/fake_nonexistent_module_xyz123.rs.";
+    let text = "Throughput benchmark exceeds 50k ops/sec as validated in src/fake_nonexistent_module_xyz123.rs.";
     let report = ResearchGate::audit(text);
 
     assert_eq!(report.verified_citations_count, 0);
@@ -185,7 +185,7 @@ fn test_nonexistent_local_file_rejected() {
 
 #[test]
 fn test_code_block_alone_not_evidence() {
-    let text = "We have proved that the sorting algorithm runs in O(1) time: ```fn sort() {}```";
+    let text = "Throughput benchmark latency is reduced to 1.2ms: ```fn sort() {}```";
     let report = ResearchGate::audit(text);
 
     assert_eq!(report.verified_citations_count, 0);

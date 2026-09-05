@@ -160,7 +160,8 @@ impl ResearchGate {
 
         // 3. Local file path check (requires actual file existence on disk)
         for w in sentence.split_whitespace() {
-            let clean = w.trim_matches(|c: char| !c.is_alphanumeric() && c != '/' && c != '\\' && c != '.');
+            let token = w.trim_matches(['(', '[', '{', '"', '\'', '`', '<', '>']);
+            let clean = token.trim_end_matches(['.', ',', ';', ':', '!', '?', ')', ']', '}', '"', '\'', '`']);
             if (clean.contains('/') || clean.contains('\\'))
                 && (clean.ends_with(".rs")
                     || clean.ends_with(".ts")
