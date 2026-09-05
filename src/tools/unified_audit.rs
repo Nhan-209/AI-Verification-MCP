@@ -595,12 +595,7 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
 
     let (decision, verdict) = if critical_count > 0 {
         ("BLOCK".to_string(), "FAIL".to_string())
-    } else if !has_any_input || weighted_scores.is_empty() {
-        (
-            "INSUFFICIENT_EVIDENCE".to_string(),
-            "UNVERIFIED".to_string(),
-        )
-    } else if !mandatory_contract_met {
+    } else if !has_any_input || weighted_scores.is_empty() || !mandatory_contract_met {
         (
             "INSUFFICIENT_EVIDENCE".to_string(),
             "UNVERIFIED".to_string(),
