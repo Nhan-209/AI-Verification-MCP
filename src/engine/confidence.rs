@@ -38,7 +38,7 @@ impl ConfidenceAnalyzer {
         }
 
         let sentences: Vec<&str> = text
-            .split(|c| c == '.' || c == '!' || c == '?' || c == '\n')
+            .split(['.', '!', '?', '\n'])
             .map(|s| s.trim())
             .filter(|s| !s.is_empty())
             .collect();
@@ -89,13 +89,11 @@ impl ConfidenceAnalyzer {
         }
 
         for word in &words {
-            if word.chars().any(|c| c.is_ascii_digit()) {
-                specific_items += 1.0;
-            } else if (word.contains('/') || word.contains('\\')) && word.contains('.') {
-                specific_items += 1.0;
-            } else if word.starts_with("http://") || word.starts_with("https://") {
-                specific_items += 1.0;
-            } else if word.contains('_')
+            if word.chars().any(|c| c.is_ascii_digit())
+                || ((word.contains('/') || word.contains('\\')) && word.contains('.'))
+                || word.starts_with("http://")
+                || word.starts_with("https://")
+                || word.contains('_')
                 || (word.chars().any(|c| c.is_uppercase())
                     && word.chars().any(|c| c.is_lowercase()))
             {
