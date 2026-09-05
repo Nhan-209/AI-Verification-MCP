@@ -1,11 +1,16 @@
 #![allow(unused_imports)]
 
 pub mod code_metrics;
+pub mod confidence;
 pub mod constraints;
 pub mod dag;
+pub mod diff_analysis;
 pub mod entropy;
 
 pub use code_metrics::{CodeAnalyzer, CodeMetrics, HalsteadMetrics};
+pub use confidence::{ConfidenceAnalyzer, ConfidenceReport};
 pub use constraints::{ConstraintEngine, ConstraintReport};
 pub use dag::{DagMetrics, PlanDag, PlanTask, TaskStatus};
+pub use diff_analysis::{ComplexityDelta, ComplexitySnapshot, DiffAnalyzer, DiffReport};
 pub use entropy::{TextEvaluator, TextMetrics};
+

@@ -73,17 +73,34 @@ impl CodeAnalyzer {
     }
 
     fn ast_analyze(code: &str, lang: &str) -> (usize, usize) {
+        #[allow(unused_mut)]
         let mut parser = Parser::new();
         let lang_lower = lang.to_lowercase();
 
         let lang_supported = match lang_lower.as_str() {
+            #[cfg(feature = "lang-rust")]
             "rust" | "rs" => parser.set_language(&tree_sitter_rust::LANGUAGE.into()).is_ok(),
-            "typescript" | "ts" | "tsx" | "javascript" | "js" => {
-                parser
-                    .set_language(&tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into())
-                    .is_ok()
-            }
+
+            #[cfg(feature = "lang-typescript")]
+            "typescript" | "ts" | "tsx" | "javascript" | "js" => parser
+                .set_language(&tree_sitter_typescript::LANGUAGE_TYPESCRIPT.into())
+                .is_ok(),
+
+            #[cfg(feature = "lang-python")]
             "python" | "py" => parser.set_language(&tree_sitter_python::LANGUAGE.into()).is_ok(),
+
+            #[cfg(feature = "lang-go")]
+            "go" | "golang" => parser.set_language(&tree_sitter_go::LANGUAGE.into()).is_ok(),
+
+            #[cfg(feature = "lang-java")]
+            "java" => parser.set_language(&tree_sitter_java::LANGUAGE.into()).is_ok(),
+
+            #[cfg(feature = "lang-c")]
+            "c" => parser.set_language(&tree_sitter_c::LANGUAGE.into()).is_ok(),
+
+            #[cfg(feature = "lang-cpp")]
+            "cpp" | "c++" | "cxx" => parser.set_language(&tree_sitter_cpp::LANGUAGE.into()).is_ok(),
+
             _ => false,
         };
 
@@ -109,7 +126,7 @@ impl CodeAnalyzer {
         }
 
         let kind = node.kind();
-        // Common decision branch kinds across Rust, TS, Python
+        // Common decision branch kinds across Rust, TS, Python, Go, Java, C, C++
         if kind.contains("if")
             || kind.contains("while")
             || kind.contains("for")
@@ -120,6 +137,8 @@ impl CodeAnalyzer {
             || kind == "||"
             || kind == "ternary_expression"
             || kind == "conditional_expression"
+            || kind == "switch_expression"
+            || kind == "try_expression"
         {
             *decisions += 1;
         }
@@ -227,6 +246,39 @@ impl CodeAnalyzer {
             && code.contains("any")
         {
             warnings.push("Potential type hole: 'any' type keyword detected.".to_string());
+        }
+
+        if lang_lower == "go" || lang_lower == "golang" {
+            if code.contains("panic(") {
+                warnings.push("Explicit panic() call detected in Go code.".to_string());
+            }
+            if code.contains("_ = ") && code.contains("err") {
+                warnings.push("Ignored error assignment ('_ = err') detected.".to_string());
+            }
+        }
+
+        if lang_lower == "java" {
+            if code.contains("catch (Exception ") || code.contains("catch (Throwable ") {
+                warnings.push(
+                    "Catching generic Exception/Throwable detected. Catch specific exceptions."
+                        .to_string(),
+                );
+            }
+            if code.contains("System.exit(") {
+                warnings.push("System.exit() found in library or service code.".to_string());
+            }
+        }
+
+        if lang_lower == "c" || lang_lower == "cpp" || lang_lower == "c++" {
+            if code.contains("malloc(") && !code.contains("free(") {
+                warnings.push("malloc() found without corresponding free() in snippet.".to_string());
+            }
+            if code.contains("strcpy(") || code.contains("sprintf(") || code.contains("gets(") {
+                warnings.push(
+                    "Unsafe C library function (buffer overflow risk: strcpy/sprintf/gets) detected."
+                        .to_string(),
+                );
+            }
         }
 
         // Universal check: unchecked index access [0] without length verification

@@ -1,4 +1,4 @@
-use crate::engine::{CodeAnalyzer, ConstraintEngine, PlanDag, TextEvaluator};
+use crate::engine::{CodeAnalyzer, ConfidenceAnalyzer, ConstraintEngine, PlanDag, TextEvaluator};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
@@ -35,15 +35,20 @@ pub struct UnifiedAuditReport {
     pub recommendations: Vec<String>,
 }
 
+struct WeightedScore {
+    score: f64,
+    weight: f64,
+}
+
 pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
     let input: UnifiedAuditInput = serde_json::from_value(args)
         .map_err(|e| format!("Invalid arguments for math_audit_cognition: {}", e))?;
 
     let mut critical_violations = Vec::new();
     let mut recommendations = Vec::new();
-    let mut score_components = Vec::new();
+    let mut weighted_scores: Vec<WeightedScore> = Vec::new();
 
-    // 1. Constraint Verification
+    // 1. Constraint Verification (Weight: 0.40)
     let constraint_report = if !input.user_requirements.is_empty() {
         let impl_claims: Vec<String> = input
             .executed_steps
@@ -74,13 +79,16 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
             ));
         }
 
-        score_components.push(rep.alignment_score * 100.0);
+        weighted_scores.push(WeightedScore {
+            score: rep.alignment_score * 100.0,
+            weight: 0.40,
+        });
         Some(rep)
     } else {
         None
     };
 
-    // 2. Plan DAG Verification
+    // 2. Plan DAG Verification (Weight: 0.20)
     let dag_report = if !input.planned_tasks.is_empty() {
         let mut dag = PlanDag::new();
         for t in &input.planned_tasks {
@@ -101,14 +109,17 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
             ));
         }
 
-        score_components.push(metrics.coverage_ratio * 100.0);
+        weighted_scores.push(WeightedScore {
+            score: metrics.coverage_ratio * 100.0,
+            weight: 0.20,
+        });
         Some(metrics)
     } else {
         None
     };
 
-    // 3. Text & Information Theory Evaluation
-    let text_report = if let Some(ref text) = input.draft_response {
+    // 3. Text & Information Theory Evaluation (Weight: 0.15)
+    let (text_report, confidence_report) = if let Some(ref text) = input.draft_response {
         let rep = TextEvaluator::evaluate(text);
         if rep.is_verbose {
             recommendations.push(
@@ -124,18 +135,32 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
             recommendations.push(sug.clone());
         }
 
+        let conf = ConfidenceAnalyzer::analyze(text);
+        if conf.verdict == "LOW_CONFIDENCE" {
+            recommendations.push(
+                "Low Confidence Warning: Draft text displays high hedging or lack of specificity."
+                    .to_string(),
+            );
+        }
+        for c in &conf.self_contradictions {
+            critical_violations.push(format!("Self-Contradiction in Response: {}", c));
+        }
+
         let text_quality = if rep.is_verbose || rep.is_too_complex {
             60.0
         } else {
             95.0
         };
-        score_components.push(text_quality);
-        Some(rep)
+        weighted_scores.push(WeightedScore {
+            score: text_quality,
+            weight: 0.15,
+        });
+        (Some(rep), Some(conf))
     } else {
-        None
+        (None, None)
     };
 
-    // 4. Code Metrics Evaluation
+    // 4. Code Metrics Evaluation (Weight: 0.25)
     let code_report = if let Some(ref code) = input.code_snippet {
         let lang = input.language.as_deref().unwrap_or("rust");
         let rep = CodeAnalyzer::analyze(code, lang);
@@ -165,16 +190,25 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
             recommendations.push(format!("Boundary Condition Warning: {}", bw));
         }
 
-        score_components.push(rep.maintainability_index);
+        weighted_scores.push(WeightedScore {
+            score: rep.maintainability_index,
+            weight: 0.25,
+        });
         Some(rep)
     } else {
         None
     };
 
-    let composite_score = if score_components.is_empty() {
+    let composite_score = if weighted_scores.is_empty() {
         100.0
     } else {
-        score_components.iter().sum::<f64>() / score_components.len() as f64
+        let total_weight: f64 = weighted_scores.iter().map(|ws| ws.weight).sum();
+        let weighted_sum: f64 = weighted_scores.iter().map(|ws| ws.score * ws.weight).sum();
+        if total_weight > 0.0 {
+            weighted_sum / total_weight
+        } else {
+            100.0
+        }
     };
 
     let verdict = if critical_violations.is_empty() && composite_score >= 70.0 {
@@ -190,6 +224,7 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
             "constraints": constraint_report,
             "dag": dag_report,
             "text": text_report,
+            "confidence": confidence_report,
             "code": code_report,
         }),
         critical_violations,

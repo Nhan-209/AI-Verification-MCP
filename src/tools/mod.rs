@@ -1,13 +1,17 @@
 #![allow(unused_imports)]
 
 pub mod code_evaluator;
+pub mod confidence_checker;
 pub mod constraint_checker;
+pub mod diff_checker;
 pub mod plan_tracker;
 pub mod text_evaluator;
 pub mod unified_audit;
 
 pub use code_evaluator::execute_code_evaluator;
+pub use confidence_checker::execute_confidence_checker;
 pub use constraint_checker::execute_constraint_checker;
+pub use diff_checker::execute_diff_checker;
 pub use plan_tracker::execute_plan_tracker;
 pub use text_evaluator::execute_text_evaluator;
 pub use unified_audit::execute_unified_audit;
@@ -19,7 +23,7 @@ pub fn get_available_tools() -> Vec<Tool> {
     vec![
         Tool {
             name: "math_audit_cognition".to_string(),
-            description: "Unified Mathematical Metacognition Gate. Verifies user requirement alignment, plan DAG adherence, text entropy/verbosity, and code metrics (McCabe, Halstead, Maintainability Index, boundary conditions) all in one call.".to_string(),
+            description: "Unified Mathematical Metacognition Gate. Verifies user requirement alignment, plan DAG adherence, text entropy/verbosity/confidence, and code metrics (McCabe, Halstead, Maintainability Index, boundary conditions) all in one call.".to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {
@@ -56,7 +60,7 @@ pub fn get_available_tools() -> Vec<Tool> {
                     },
                     "language": {
                         "type": "string",
-                        "description": "Programming language (rust, typescript, javascript, python, etc.)"
+                        "description": "Programming language (rust, typescript, javascript, python, go, java, c, cpp, etc.)"
                     }
                 }
             }),
@@ -94,14 +98,27 @@ pub fn get_available_tools() -> Vec<Tool> {
                 "type": "object",
                 "properties": {
                     "code": { "type": "string", "description": "Source code to analyze" },
-                    "language": { "type": "string", "description": "Language: rust, typescript, python, etc." }
+                    "language": { "type": "string", "description": "Language: rust, typescript, python, go, java, c, cpp, etc." }
                 },
                 "required": ["code"]
             }),
         },
         Tool {
+            name: "math_eval_diff".to_string(),
+            description: "Analyzes code diffs using Longest Common Subsequence (LCS), measuring change ratio, cyclomatic and maintainability deltas, functions affected, and regression risk.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "before_code": { "type": "string", "description": "Original source code" },
+                    "after_code": { "type": "string", "description": "Modified source code" },
+                    "language": { "type": "string", "description": "Language: rust, typescript, python, go, java, c, cpp, etc." }
+                },
+                "required": ["before_code", "after_code"]
+            }),
+        },
+        Tool {
             name: "math_eval_text".to_string(),
-            description: "Evaluates text through Information Theory (Shannon Entropy, Information Density), Kolmogorov compression estimation, and readability (Flesch-Kincaid, Gunning Fog).".to_string(),
+            description: "Evaluates text through Information Theory (Shannon Entropy, Information Density), Kolmogorov compression estimation, readability (Flesch-Kincaid, Gunning Fog), and AI filler detection.".to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {
@@ -111,8 +128,19 @@ pub fn get_available_tools() -> Vec<Tool> {
             }),
         },
         Tool {
+            name: "math_confidence".to_string(),
+            description: "Evaluates AI draft responses for metacognitive confidence, hedging ratio, assertion density, specificity (paths, code blocks, metrics), and self-contradictions.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "text": { "type": "string", "description": "AI response text to evaluate" }
+                },
+                "required": ["text"]
+            }),
+        },
+        Tool {
             name: "math_verify_constraints".to_string(),
-            description: "Formal Set Theory constraint verification. Calculates missing requirements, unrequested scope creep, and direct logical contradictions.".to_string(),
+            description: "Formal Set Theory constraint verification with n-gram Jaccard semantic matching and dynamic negation pattern contradiction detection.".to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {

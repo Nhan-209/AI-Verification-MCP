@@ -15,6 +15,9 @@ pub struct TextMetrics {
     pub flesch_reading_ease: f64,
     pub gunning_fog_index: f64,
     pub information_density: f64,
+    pub filler_count: usize,
+    pub filler_ratio: f64,
+    pub estimated_optimal_length: usize,
     pub is_verbose: bool,
     pub is_too_complex: bool,
     pub suggestions: Vec<String>,
@@ -37,6 +40,9 @@ impl TextEvaluator {
                 flesch_reading_ease: 100.0,
                 gunning_fog_index: 0.0,
                 information_density: 0.0,
+                filler_count: 0,
+                filler_ratio: 0.0,
+                estimated_optimal_length: 0,
                 is_verbose: false,
                 is_too_complex: false,
                 suggestions: vec!["Text is empty".to_string()],
@@ -61,6 +67,9 @@ impl TextEvaluator {
                 flesch_reading_ease: 100.0,
                 gunning_fog_index: 0.0,
                 information_density: 0.0,
+                filler_count: 0,
+                filler_ratio: 0.0,
+                estimated_optimal_length: 0,
                 is_verbose: false,
                 is_too_complex: false,
                 suggestions: vec!["No valid words found".to_string()],
@@ -117,13 +126,50 @@ impl TextEvaluator {
         // Information Density = Entropy * TTR
         let information_density = shannon_entropy_bits * type_token_ratio;
 
+        // AI filler phrases check
+        const AI_FILLER_PHRASES: &[&str] = &[
+            "as an ai",
+            "i'd be happy to",
+            "let me explain",
+            "certainly!",
+            "of course!",
+            "great question",
+            "i understand",
+            "absolutely",
+            "sure thing",
+            "here's what i",
+            "i'll help you",
+            "let me help",
+        ];
+
+        let lower_cleaned = cleaned.to_lowercase();
+        let mut filler_count = 0;
+        for &filler in AI_FILLER_PHRASES {
+            filler_count += lower_cleaned.matches(filler).count();
+        }
+        let filler_ratio = filler_count as f64 / sentence_count as f64;
+
+        // Estimated optimal length based on information density & compressibility
+        let compression_penalty = (1.0 - compression_ratio).clamp(0.0, 0.7);
+        let efficiency = (type_token_ratio * 0.5 + (1.0 - compression_penalty) * 0.5).clamp(0.3, 1.0);
+        let estimated_optimal_length = ((word_count as f64 * efficiency).round() as usize).max(1);
+
         let mut suggestions = Vec::new();
-        let is_verbose = word_count > 450 && (type_token_ratio < 0.45 || compression_ratio < 0.35);
+        let is_verbose = (word_count > 450 && (type_token_ratio < 0.45 || compression_ratio < 0.35))
+            || filler_count >= 2;
+
         if is_verbose {
             suggestions.push(
                 "Text exhibits high redundancy / filler tokens. Consider condensing explanations."
                     .to_string(),
             );
+        }
+
+        if filler_count > 0 {
+            suggestions.push(format!(
+                "Detected {} conversational AI filler phrase(s). Direct technical delivery recommended.",
+                filler_count
+            ));
         }
 
         let is_too_complex = flesch_reading_ease < 30.0 || gunning_fog_index > 17.0;
@@ -147,6 +193,9 @@ impl TextEvaluator {
             flesch_reading_ease,
             gunning_fog_index,
             information_density,
+            filler_count,
+            filler_ratio,
+            estimated_optimal_length,
             is_verbose,
             is_too_complex,
             suggestions,
@@ -205,7 +254,17 @@ mod tests {
         assert!(metrics.unique_words > 10);
         assert!(metrics.shannon_entropy_bits > 0.0);
         assert!(metrics.type_token_ratio > 0.5);
+        assert_eq!(metrics.filler_count, 0);
         assert!(!metrics.is_verbose);
+    }
+
+    #[test]
+    fn test_filler_detection() {
+        let sample = "As an AI, I'd be happy to explain this concept to you. Certainly! Let me help you.";
+        let metrics = TextEvaluator::evaluate(sample);
+
+        assert!(metrics.filler_count >= 2);
+        assert!(metrics.is_verbose);
     }
 
     #[test]
