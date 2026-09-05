@@ -2,60 +2,159 @@
 
 /// Common abbreviations in English and Vietnamese that should not trigger sentence boundaries.
 pub const COMMON_ABBREVIATIONS: &[&str] = &[
-    "e.g.", "i.e.", "vs.", "etc.", "approx.", "dept.", "fig.", "prof.", "dr.", "mr.", "mrs.",
-    "vd.", "tp.", "th.s", "ts.", "ths.", "bs.", "ks.",
+    "e.g.", "i.e.", "vs.", "etc.", "approx.", "dept.", "fig.", "prof.", "dr.", "mr.", "mrs.", "vd.", "tp.", "th.s",
+    "ts.", "ths.", "bs.", "ks.",
 ];
 
 /// English and Vietnamese hedging phrases expressing uncertainty or evasiveness.
 pub const HEDGING_PHRASES: &[&str] = &[
     // English
-    "maybe", "probably", "i think", "might", "could be", "not sure", "perhaps", "possibly",
-    "it seems", "i believe", "i guess", "it appears", "likely", "unlikely", "not certain",
-    "unclear", "debatable", "in my opinion", "it depends", "hard to say",
+    "maybe",
+    "probably",
+    "i think",
+    "might",
+    "could be",
+    "not sure",
+    "perhaps",
+    "possibly",
+    "it seems",
+    "i believe",
+    "i guess",
+    "it appears",
+    "likely",
+    "unlikely",
+    "not certain",
+    "unclear",
+    "debatable",
+    "in my opinion",
+    "it depends",
+    "hard to say",
     // Vietnamese
-    "có lẽ", "tôi nghĩ", "chắc là", "hình như", "dường như", "có thể là", "không chắc",
-    "chưa rõ", "tùy thuộc", "khó nói", "theo tôi thấy", "dường như là", "phỏng đoán",
+    "có lẽ",
+    "tôi nghĩ",
+    "chắc là",
+    "hình như",
+    "dường như",
+    "có thể là",
+    "không chắc",
+    "chưa rõ",
+    "tùy thuộc",
+    "khó nói",
+    "theo tôi thấy",
+    "dường như là",
+    "phỏng đoán",
 ];
 
 /// English and Vietnamese absolute or overconfident claims.
 pub const OVERCONFIDENCE_PHRASES: &[&str] = &[
     // English
-    "guaranteed", "100%", "definitely", "always", "never fails", "flawless", "completely impossible",
-    "undeniably", "absolute truth", "zero bugs", "foolproof", "perfect solution",
+    "guaranteed",
+    "100%",
+    "definitely",
+    "always",
+    "never fails",
+    "flawless",
+    "completely impossible",
+    "undeniably",
+    "absolute truth",
+    "zero bugs",
+    "foolproof",
+    "perfect solution",
     // Vietnamese
-    "chắc chắn 100%", "đảm bảo tuyệt đối", "hoàn hảo", "không bao giờ lỗi", "không thể sai",
-    "chắc chắn luôn", "tuyệt đối đúng", "hoàn toàn không có lỗi", "cam kết 100%",
+    "chắc chắn 100%",
+    "đảm bảo tuyệt đối",
+    "hoàn hảo",
+    "không bao giờ lỗi",
+    "không thể sai",
+    "chắc chắn luôn",
+    "tuyệt đối đúng",
+    "hoàn toàn không có lỗi",
+    "cam kết 100%",
 ];
 
 /// English and Vietnamese conversational AI filler phrases.
 pub const AI_FILLER_PHRASES: &[&str] = &[
     // English
-    "as an ai", "i'd be happy to", "let me explain", "certainly!", "of course!",
-    "great question", "i understand", "absolutely", "sure thing", "here's what i",
-    "i'll help you", "let me help", "in conclusion", "to summarize",
+    "as an ai",
+    "i'd be happy to",
+    "let me explain",
+    "certainly!",
+    "of course!",
+    "great question",
+    "i understand",
+    "absolutely",
+    "sure thing",
+    "here's what i",
+    "i'll help you",
+    "let me help",
+    "in conclusion",
+    "to summarize",
     // Vietnamese
-    "với tư cách là ai", "tôi rất vui được", "để tôi giải thích", "chắc chắn rồi!",
-    "câu hỏi rất hay", "tôi hiểu rồi", "dưới đây là", "đây là những gì tôi", "tóm lại là",
+    "với tư cách là ai",
+    "tôi rất vui được",
+    "để tôi giải thích",
+    "chắc chắn rồi!",
+    "câu hỏi rất hay",
+    "tôi hiểu rồi",
+    "dưới đây là",
+    "đây là những gì tôi",
+    "tóm lại là",
 ];
 
 /// English and Vietnamese markers indicating factual evidence or citations.
 pub const EVIDENCE_MARKERS: &[&str] = &[
     // English
-    "rfc", "ieee", "iso", "documentation", "docs.rs", "github.com", "benchmark", "commit",
-    "verified via", "tested with", "log output", "reference:", "source:", "according to",
+    "rfc",
+    "ieee",
+    "iso",
+    "documentation",
+    "docs.rs",
+    "github.com",
+    "benchmark",
+    "commit",
+    "verified via",
+    "tested with",
+    "log output",
+    "reference:",
+    "source:",
+    "according to",
     // Vietnamese
-    "tài liệu", "trích dẫn", "theo chuẩn", "đã kiểm thử", "kết quả đo", "nhật ký lỗi", "nguồn:",
+    "tài liệu",
+    "trích dẫn",
+    "theo chuẩn",
+    "đã kiểm thử",
+    "kết quả đo",
+    "nhật ký lỗi",
+    "nguồn:",
 ];
 
 /// English and Vietnamese markers indicating proactive foresight (edge cases, error handling).
 pub const FORESIGHT_MARKERS: &[&str] = &[
     // English
-    "error handling", "edge case", "boundary condition", "fallback", "timeout", "retry logic",
-    "race condition", "graceful degradation", "backward compatibility", "migration path",
-    "unit test", "integration test", "panic recovery",
+    "error handling",
+    "edge case",
+    "boundary condition",
+    "fallback",
+    "timeout",
+    "retry logic",
+    "race condition",
+    "graceful degradation",
+    "backward compatibility",
+    "migration path",
+    "unit test",
+    "integration test",
+    "panic recovery",
     // Vietnamese
-    "xử lý lỗi", "trường hợp biên", "ngoại lệ", "dự phòng", "hết thời gian", "thử lại",
-    "tương thích ngược", "kiểm thử đơn vị", "kế hoạch di chuyển", "phục hồi lỗi",
+    "xử lý lỗi",
+    "trường hợp biên",
+    "ngoại lệ",
+    "dự phòng",
+    "hết thời gian",
+    "thử lại",
+    "tương thích ngược",
+    "kiểm thử đơn vị",
+    "kế hoạch di chuyển",
+    "phục hồi lỗi",
 ];
 
 /// Splits text into clean sentences without shredding URLs, version tags, decimals, or abbreviations.
@@ -170,11 +269,7 @@ pub fn smart_split_sentences(text: &str) -> Vec<String> {
             while end_idx + 1 < len && matches!(chars[end_idx + 1], '.' | '!' | '?') {
                 end_idx += 1;
             }
-            while end_idx + 1 < len
-                && matches!(
-                    chars[end_idx + 1],
-                    ')' | '"' | '\'' | '”' | '’' | ']' | '}' | '»'
-                )
+            while end_idx + 1 < len && matches!(chars[end_idx + 1], ')' | '"' | '\'' | '”' | '’' | ']' | '}' | '»')
             {
                 end_idx += 1;
             }
@@ -217,7 +312,8 @@ mod tests {
 
     #[test]
     fn test_smart_split_urls_and_versions() {
-        let text = "Visit https://github.com/Nhan-209/mcp-plugin-math for v0.2.0 updates. The value is 3.1415! Are you ready?";
+        let text =
+            "Visit https://github.com/Nhan-209/mcp-plugin-math for v0.2.0 updates. The value is 3.1415! Are you ready?";
         let sentences = smart_split_sentences(text);
 
         assert_eq!(sentences.len(), 3);

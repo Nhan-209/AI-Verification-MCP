@@ -75,42 +75,69 @@ fn test_integration_protocol_lifecycle() {
 #[test]
 fn test_integration_primary_verify_tools_execution() {
     let tool_calls = vec![
-        ("verify_agent", json!({
-            "user_requirements": ["task a"],
-            "executed_steps": ["task a"],
-            "draft_response": "Completed according to RFC 2119. Reference: https://tools.ietf.org/html/rfc2119"
-        })),
-        ("verify_dag", json!({
-            "tasks": [{"id": "1", "name": "step 1", "dependencies": []}],
-            "executed_steps": ["1"]
-        })),
-        ("verify_code", json!({
-            "code": "fn add(a: i32, b: i32) -> i32 { a + b }",
-            "language": "rust"
-        })),
-        ("verify_diff", json!({
-            "before_code": "let a = 1;",
-            "after_code": "let a = 2;",
-            "language": "rust"
-        })),
-        ("verify_text", json!({
-            "text": "Information theory provides mathematical definitions for communication channels and entropy."
-        })),
-        ("verify_confidence", json!({
-            "text": "The library is available at https://crates.io/crates/serde with over 100M downloads."
-        })),
-        ("verify_research", json!({
-            "text": "According to IEEE 754 and docs.rs, float rounding behavior is strictly defined. See: https://docs.rs/example"
-        })),
-        ("verify_foresight", json!({
-            "text": "We implement timeout recovery, retry mechanisms, and edge case guards.",
-            "planned_tasks_count": 3,
-            "requirements_count": 2
-        })),
-        ("verify_constraints", json!({
-            "requirements": ["must support async"],
-            "implementations": ["fully supports async processing"]
-        })),
+        (
+            "verify_agent",
+            json!({
+                "user_requirements": ["task a"],
+                "executed_steps": ["task a"],
+                "draft_response": "Completed according to RFC 2119. Reference: https://tools.ietf.org/html/rfc2119"
+            }),
+        ),
+        (
+            "verify_dag",
+            json!({
+                "tasks": [{"id": "1", "name": "step 1", "dependencies": []}],
+                "executed_steps": ["1"]
+            }),
+        ),
+        (
+            "verify_code",
+            json!({
+                "code": "fn add(a: i32, b: i32) -> i32 { a + b }",
+                "language": "rust"
+            }),
+        ),
+        (
+            "verify_diff",
+            json!({
+                "before_code": "let a = 1;",
+                "after_code": "let a = 2;",
+                "language": "rust"
+            }),
+        ),
+        (
+            "verify_text",
+            json!({
+                "text": "Information theory provides mathematical definitions for communication channels and entropy."
+            }),
+        ),
+        (
+            "verify_confidence",
+            json!({
+                "text": "The library is available at https://crates.io/crates/serde with over 100M downloads."
+            }),
+        ),
+        (
+            "verify_research",
+            json!({
+                "text": "According to IEEE 754 and docs.rs, float rounding behavior is strictly defined. See: https://docs.rs/example"
+            }),
+        ),
+        (
+            "verify_foresight",
+            json!({
+                "text": "We implement timeout recovery, retry mechanisms, and edge case guards.",
+                "planned_tasks_count": 3,
+                "requirements_count": 2
+            }),
+        ),
+        (
+            "verify_constraints",
+            json!({
+                "requirements": ["must support async"],
+                "implementations": ["fully supports async processing"]
+            }),
+        ),
     ];
 
     for (i, (tool_name, args)) in tool_calls.into_iter().enumerate() {
@@ -129,49 +156,81 @@ fn test_integration_primary_verify_tools_execution() {
         let result_val = res.result.expect("Tool result missing");
         let content = result_val["content"].as_array().expect("Result content must be array");
         assert!(!content.is_empty(), "Tool '{}' returned empty content", tool_name);
-        assert_eq!(result_val.get("isError"), None, "Tool '{}' reported execution error", tool_name);
+        assert_eq!(
+            result_val.get("isError"),
+            None,
+            "Tool '{}' reported execution error",
+            tool_name
+        );
     }
 }
 
 #[test]
 fn test_integration_legacy_math_aliases() {
     let tool_calls = vec![
-        ("math_audit_cognition", json!({
-            "user_requirements": ["task a"],
-            "executed_steps": ["task a"],
-            "draft_response": "Completed according to RFC 2119. Reference: https://tools.ietf.org/html/rfc2119"
-        })),
-        ("math_track_dag", json!({
-            "tasks": [{"id": "1", "name": "step 1", "dependencies": []}],
-            "executed_steps": ["1"]
-        })),
-        ("math_eval_code", json!({
-            "code": "fn add(a: i32, b: i32) -> i32 { a + b }",
-            "language": "rust"
-        })),
-        ("math_eval_diff", json!({
-            "before_code": "let a = 1;",
-            "after_code": "let a = 2;",
-            "language": "rust"
-        })),
-        ("math_eval_text", json!({
-            "text": "Information theory provides mathematical definitions for communication channels and entropy."
-        })),
-        ("math_confidence", json!({
-            "text": "The library is available at https://crates.io/crates/serde with over 100M downloads."
-        })),
-        ("math_audit_research", json!({
-            "text": "According to IEEE 754 and docs.rs, float rounding behavior is strictly defined. See: https://docs.rs/example"
-        })),
-        ("math_eval_foresight", json!({
-            "text": "We implement timeout recovery, retry mechanisms, and edge case guards.",
-            "planned_tasks_count": 3,
-            "requirements_count": 2
-        })),
-        ("math_verify_constraints", json!({
-            "requirements": ["must support async"],
-            "implementations": ["fully supports async processing"]
-        })),
+        (
+            "math_audit_cognition",
+            json!({
+                "user_requirements": ["task a"],
+                "executed_steps": ["task a"],
+                "draft_response": "Completed according to RFC 2119. Reference: https://tools.ietf.org/html/rfc2119"
+            }),
+        ),
+        (
+            "math_track_dag",
+            json!({
+                "tasks": [{"id": "1", "name": "step 1", "dependencies": []}],
+                "executed_steps": ["1"]
+            }),
+        ),
+        (
+            "math_eval_code",
+            json!({
+                "code": "fn add(a: i32, b: i32) -> i32 { a + b }",
+                "language": "rust"
+            }),
+        ),
+        (
+            "math_eval_diff",
+            json!({
+                "before_code": "let a = 1;",
+                "after_code": "let a = 2;",
+                "language": "rust"
+            }),
+        ),
+        (
+            "math_eval_text",
+            json!({
+                "text": "Information theory provides mathematical definitions for communication channels and entropy."
+            }),
+        ),
+        (
+            "math_confidence",
+            json!({
+                "text": "The library is available at https://crates.io/crates/serde with over 100M downloads."
+            }),
+        ),
+        (
+            "math_audit_research",
+            json!({
+                "text": "According to IEEE 754 and docs.rs, float rounding behavior is strictly defined. See: https://docs.rs/example"
+            }),
+        ),
+        (
+            "math_eval_foresight",
+            json!({
+                "text": "We implement timeout recovery, retry mechanisms, and edge case guards.",
+                "planned_tasks_count": 3,
+                "requirements_count": 2
+            }),
+        ),
+        (
+            "math_verify_constraints",
+            json!({
+                "requirements": ["must support async"],
+                "implementations": ["fully supports async processing"]
+            }),
+        ),
     ];
 
     for (i, (tool_name, args)) in tool_calls.into_iter().enumerate() {
@@ -186,11 +245,24 @@ fn test_integration_legacy_math_aliases() {
         };
 
         let res = handle_request(req).unwrap_or_else(|| panic!("Legacy tool '{}' failed to respond", tool_name));
-        assert!(res.error.is_none(), "Legacy tool '{}' returned JSON-RPC error", tool_name);
+        assert!(
+            res.error.is_none(),
+            "Legacy tool '{}' returned JSON-RPC error",
+            tool_name
+        );
         let result_val = res.result.expect("Tool result missing");
         let content = result_val["content"].as_array().expect("Result content must be array");
-        assert!(!content.is_empty(), "Legacy tool '{}' returned empty content", tool_name);
-        assert_eq!(result_val.get("isError"), None, "Legacy tool '{}' reported execution error", tool_name);
+        assert!(
+            !content.is_empty(),
+            "Legacy tool '{}' returned empty content",
+            tool_name
+        );
+        assert_eq!(
+            result_val.get("isError"),
+            None,
+            "Legacy tool '{}' reported execution error",
+            tool_name
+        );
     }
 }
 

@@ -34,9 +34,7 @@ impl ConstraintEngine {
 
         for req in &req_set {
             // Check semantic or keyword containment
-            let is_covered = impl_set
-                .iter()
-                .any(|imp| Self::is_semantically_matched(req, imp));
+            let is_covered = impl_set.iter().any(|imp| Self::is_semantically_matched(req, imp));
             if is_covered {
                 satisfied_count += 1;
             } else {
@@ -50,9 +48,7 @@ impl ConstraintEngine {
             if imp.len() > 60 || imp.split_whitespace().count() > 8 {
                 continue;
             }
-            let is_demanded = req_set
-                .iter()
-                .any(|req| Self::is_semantically_matched(req, imp));
+            let is_demanded = req_set.iter().any(|req| Self::is_semantically_matched(req, imp));
             if !is_demanded {
                 scope_creep.push(imp.clone());
             }
@@ -98,11 +94,45 @@ impl ConstraintEngine {
         let word_overlap = Self::word_overlap_ratio(&req_clean, &imp_clean);
 
         let stop_words = [
-            "must", "be", "in", "the", "a", "an", "for", "to", "of", "with", "and", "by", "all",
-            "is", "use", "using", "support", "supports", "added", "implemented", "have", "has",
+            "must",
+            "be",
+            "in",
+            "the",
+            "a",
+            "an",
+            "for",
+            "to",
+            "of",
+            "with",
+            "and",
+            "by",
+            "all",
+            "is",
+            "use",
+            "using",
+            "support",
+            "supports",
+            "added",
+            "implemented",
+            "have",
+            "has",
             // Vietnamese stop words
-            "và", "là", "của", "trong", "cho", "với", "để", "các", "những", "phải", "được", "có",
-            "đã", "sử", "dụng", "thêm",
+            "và",
+            "là",
+            "của",
+            "trong",
+            "cho",
+            "với",
+            "để",
+            "các",
+            "những",
+            "phải",
+            "được",
+            "có",
+            "đã",
+            "sử",
+            "dụng",
+            "thêm",
         ];
         let key_words_req: Vec<&str> = req_clean
             .split_whitespace()
@@ -124,9 +154,8 @@ impl ConstraintEngine {
         // Detect when an essential requirement entity is replaced by an unrequested entity (e.g. "secrets" -> "logs")
         let unfulfilled: Vec<&&str> = key_words_req.iter().filter(|&&w| !imp_clean.contains(w)).collect();
         let extra: Vec<&&str> = key_words_imp.iter().filter(|&&w| !req_clean.contains(w)).collect();
-        let has_entity_divergence = !unfulfilled.is_empty()
-            && !extra.is_empty()
-            && unfulfilled.iter().any(|w| w.len() >= 4);
+        let has_entity_divergence =
+            !unfulfilled.is_empty() && !extra.is_empty() && unfulfilled.iter().any(|w| w.len() >= 4);
 
         if has_entity_divergence && key_words_req.len() <= 6 {
             return false;

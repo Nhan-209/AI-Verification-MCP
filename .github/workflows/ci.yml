@@ -10,8 +10,39 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  fmt:
+    name: Format Check
+    runs-on: ubuntu-latest
+    # Only run on PRs; on push to main, files are already formatted.
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Install Rust Toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Format and commit if needed
+        run: |
+          cargo fmt --all
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          if ! git diff --quiet -- '*.rs'; then
+            git commit -am "chore(fmt): auto-format Rust source [skip ci]"
+            git push
+          else
+            echo "All files already formatted."
+          fi
+
   check-and-test:
     name: Check, Test & Build (${{ matrix.os }})
+    needs: fmt
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -21,6 +52,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
 
       - name: Install Rust Toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -29,9 +62,6 @@ jobs:
 
       - name: Rust Cache
         uses: Swatinem/rust-cache@v2
-
-      - name: Format Code
-        run: cargo fmt
 
       - name: Clippy Default Features
         run: cargo clippy --all-targets -- -D warnings

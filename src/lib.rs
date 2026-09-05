@@ -1,3 +1,3 @@
-﻿pub mod engine;
+pub mod engine;
 pub mod mcp;
 pub mod tools;

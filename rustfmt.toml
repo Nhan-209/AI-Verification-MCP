@@ -1,0 +1,5 @@
+﻿# rustfmt configuration
+# Line width increased to accommodate existing code style.
+# The default (100) causes rustfmt to wrap long tree-sitter parser method chains
+# and string arrays in ways that differ from the authored style.
+max_width = 120

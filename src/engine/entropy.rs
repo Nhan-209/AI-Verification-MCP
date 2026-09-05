@@ -112,8 +112,7 @@ impl TextEvaluator {
         // Flesch Reading Ease: 206.835 - 1.015 * (words / sentences) - 84.6 * (syllables / words)
         let words_per_sentence = word_count as f64 / sentence_count as f64;
         let syllables_per_word = total_syllables as f64 / word_count as f64;
-        let flesch_reading_ease =
-            206.835 - (1.015 * words_per_sentence) - (84.6 * syllables_per_word);
+        let flesch_reading_ease = 206.835 - (1.015 * words_per_sentence) - (84.6 * syllables_per_word);
 
         // Gunning Fog Index: 0.4 * ((words / sentences) + 100 * (complex_words / words))
         let complex_ratio = complex_words as f64 / word_count as f64;
@@ -135,14 +134,12 @@ impl TextEvaluator {
         let estimated_optimal_length = ((word_count as f64 * efficiency).round() as usize).max(1);
 
         let mut suggestions = Vec::new();
-        let is_verbose = (word_count > 450 && (type_token_ratio < 0.45 || compression_ratio < 0.35))
-            || filler_count >= 2;
+        let is_verbose =
+            (word_count > 450 && (type_token_ratio < 0.45 || compression_ratio < 0.35)) || filler_count >= 2;
 
         if is_verbose {
-            suggestions.push(
-                "Text exhibits high redundancy / filler tokens. Consider condensing explanations."
-                    .to_string(),
-            );
+            suggestions
+                .push("Text exhibits high redundancy / filler tokens. Consider condensing explanations.".to_string());
         }
 
         if filler_count > 0 {
@@ -162,9 +159,8 @@ impl TextEvaluator {
             || text.contains(".py")
             || text.contains("::");
 
-        let is_too_complex = !has_technical_terms
-            && word_count >= 40
-            && (flesch_reading_ease < 30.0 || gunning_fog_index > 17.0);
+        let is_too_complex =
+            !has_technical_terms && word_count >= 40 && (flesch_reading_ease < 30.0 || gunning_fog_index > 17.0);
         if is_too_complex {
             suggestions.push(
                 "Text is overly dense, academic, or hard to parse. Shorten sentences and simplify syntax.".to_string(),
@@ -261,9 +257,7 @@ mod tests {
 
     #[test]
     fn test_highly_repetitive_text() {
-        let repetitive =
-            "test test test test test test test test test test test test test test test test "
-                .repeat(30);
+        let repetitive = "test test test test test test test test test test test test test test test test ".repeat(30);
         let metrics = TextEvaluator::evaluate(&repetitive);
 
         assert!(metrics.type_token_ratio < 0.1);

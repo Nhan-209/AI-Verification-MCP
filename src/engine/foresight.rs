@@ -31,8 +31,17 @@ impl ForesightEngine {
     /// Returns `(has_affirmative, has_negated)`.
     pub fn analyze_term_presence(text: &str, term: &str) -> (bool, bool) {
         const NEGATION_PREFIXES: &[&str] = &[
-            "no ", "not ", "don't ", "never ", "without ", "lack of ", "lacks ",
-            "chưa có ", "không có ", "không cần ", "bỏ qua ",
+            "no ",
+            "not ",
+            "don't ",
+            "never ",
+            "without ",
+            "lack of ",
+            "lacks ",
+            "chưa có ",
+            "không có ",
+            "không cần ",
+            "bỏ qua ",
         ];
 
         let mut search_idx = 0;
@@ -83,8 +92,20 @@ impl ForesightEngine {
 
         // 1. Defensive design detection
         let defensive_terms = [
-            "error", "result<", "option<", "try", "catch", "fallback", "timeout",
-            "retry", "null", "none", "recover", "xử lý lỗi", "ngoại lệ", "dự phòng",
+            "error",
+            "result<",
+            "option<",
+            "try",
+            "catch",
+            "fallback",
+            "timeout",
+            "retry",
+            "null",
+            "none",
+            "recover",
+            "xử lý lỗi",
+            "ngoại lệ",
+            "dự phòng",
         ];
         let mut defensive_matches = 0;
         let mut explicit_defensive_negations = 0;
@@ -101,8 +122,17 @@ impl ForesightEngine {
 
         // 2. Edge case and boundary condition detection
         let edge_case_terms = [
-            "empty", "overflow", "boundary", "edge case", "limit", "zero", "concurrency",
-            "trường hợp biên", "rỗng", "giới hạn", "tràn số",
+            "empty",
+            "overflow",
+            "boundary",
+            "edge case",
+            "limit",
+            "zero",
+            "concurrency",
+            "trường hợp biên",
+            "rỗng",
+            "giới hạn",
+            "tràn số",
         ];
         let mut edge_matches = 0;
         for &term in &edge_case_terms {
@@ -115,7 +145,13 @@ impl ForesightEngine {
 
         // 3. Verification & testing coverage
         let verification_terms = [
-            "test", "assert", "verify", "benchmark", "validate", "kiểm thử", "xác thực",
+            "test",
+            "assert",
+            "verify",
+            "benchmark",
+            "validate",
+            "kiểm thử",
+            "xác thực",
         ];
         let mut verif_matches = 0;
         for &term in &verification_terms {
@@ -138,7 +174,8 @@ impl ForesightEngine {
         let is_lazy_plan = requirements_count >= 3 && planned_tasks_count <= 1;
 
         // 5. Composite foresight score
-        let content_score = (defensive_coverage * 40.0 + edge_case_coverage * 30.0 + verification_coverage * 30.0).clamp(0.0, 100.0);
+        let content_score =
+            (defensive_coverage * 40.0 + edge_case_coverage * 30.0 + verification_coverage * 30.0).clamp(0.0, 100.0);
         let foresight_score = if is_lazy_plan {
             content_score.min(45.0)
         } else {
@@ -180,8 +217,7 @@ impl ForesightEngine {
         }
         if verification_coverage < 0.4 {
             recommendations.push(
-                "Missing Verification Strategy: Define automated tests or measurable validation criteria."
-                    .to_string(),
+                "Missing Verification Strategy: Define automated tests or measurable validation criteria.".to_string(),
             );
         }
 
