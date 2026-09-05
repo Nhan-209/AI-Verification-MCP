@@ -105,6 +105,19 @@ impl PlanDag {
     /// Checks if an unplanned task is a benign exploratory or verification step.
     pub fn is_exploratory_action(action_id: &str) -> bool {
         let lower = action_id.to_lowercase();
+        if lower.starts_with("implement")
+            || lower.starts_with("create")
+            || lower.starts_with("build")
+            || lower.starts_with("add")
+            || lower.starts_with("modify")
+            || lower.starts_with("delete")
+            || lower.starts_with("remove")
+            || lower.starts_with("thực thi")
+            || lower.starts_with("xóa")
+            || lower.starts_with("tạo")
+        {
+            return false;
+        }
         const EXPLORATORY_KEYWORDS: &[&str] = &[
             "read", "view", "check", "inspect", "grep", "search", "list",
             "find", "stat", "status", "test", "audit", "verify", "diff",

@@ -231,7 +231,7 @@ fn test_governance_benchmark_quick_mode_latency_under_1ms() {
         "mode": "quick",
         "user_requirements": ["implement fast check"],
         "executed_steps": ["implement fast check"],
-        "draft_response": "Verification confirmed by automated test run."
+        "draft_response": "Verification confirmed by automated test run in tests/bench.rs."
     });
 
     let _ = execute_unified_audit(quick_payload.clone()).expect("Warmup failed");

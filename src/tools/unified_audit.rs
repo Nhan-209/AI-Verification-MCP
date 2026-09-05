@@ -122,7 +122,7 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
         }
 
         for step in &input.executed_steps {
-            if !known_ids.contains(step.as_str()) && !PlanDag::is_exploratory_action(step) {
+            if !known_ids.contains(step.as_str()) {
                 impl_claims.push(step.clone());
             }
         }
