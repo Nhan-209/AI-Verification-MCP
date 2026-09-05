@@ -29,7 +29,13 @@ pub struct UnifiedAuditInput {
     pub language: Option<String>,
     #[serde(default)]
     pub mode: Option<String>,
+    /// Explicit audit phase: "plan" (validate plan structure only, no execution coverage required)
+    /// or "execution" (validate plan + execution coverage). When omitted, auto-detected:
+    /// if executed_steps is empty → "plan", otherwise → "execution".
+    #[serde(default)]
+    pub audit_phase: Option<String>,
 }
+
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub enum ViolationSeverity {
@@ -98,13 +104,93 @@ fn add_violation(
     });
 }
 
+// ─── Resource limits ──────────────────────────────────────────────────────────
+const MAX_TASKS: usize = 200;
+const MAX_REQUIREMENTS: usize = 200;
+const MAX_EXECUTED_STEPS: usize = 500;
+const MAX_CODE_BYTES: usize = 512 * 1024; // 512 KB
+const MAX_TEXT_BYTES: usize = 64 * 1024; // 64 KB
+const MAX_TASK_ID_LEN: usize = 64;
+const MAX_TASK_NAME_LEN: usize = 256;
+
 pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
     let input: UnifiedAuditInput = serde_json::from_value(args)
         .map_err(|e| format!("Invalid arguments for math_audit_cognition: {}", e))?;
 
+    // ── Mode validation (reject unknown modes immediately) ────────────────────
     let mode_str = input.mode.as_deref().unwrap_or("standard").to_lowercase();
+    if !["quick", "standard", "deep"].contains(&mode_str.as_str()) {
+        return Err(format!(
+            "Invalid mode '{}'. Accepted values: quick, standard, deep.",
+            mode_str
+        ));
+    }
     let is_quick = mode_str == "quick";
     let is_deep = mode_str == "deep";
+
+    // ── Resource limit guards (DoS / resource exhaustion prevention) ──────────
+    if input.planned_tasks.len() > MAX_TASKS {
+        return Err(format!(
+            "Resource limit exceeded: planned_tasks count {} > MAX_TASKS {}",
+            input.planned_tasks.len(),
+            MAX_TASKS
+        ));
+    }
+    if input.user_requirements.len() > MAX_REQUIREMENTS {
+        return Err(format!(
+            "Resource limit exceeded: user_requirements count {} > MAX_REQUIREMENTS {}",
+            input.user_requirements.len(),
+            MAX_REQUIREMENTS
+        ));
+    }
+    if input.executed_steps.len() > MAX_EXECUTED_STEPS {
+        return Err(format!(
+            "Resource limit exceeded: executed_steps count {} > MAX_EXECUTED_STEPS {}",
+            input.executed_steps.len(),
+            MAX_EXECUTED_STEPS
+        ));
+    }
+    if let Some(ref code) = input.code_snippet {
+        if code.len() > MAX_CODE_BYTES {
+            return Err(format!(
+                "Resource limit exceeded: code_snippet size {} bytes > MAX_CODE_BYTES {}",
+                code.len(),
+                MAX_CODE_BYTES
+            ));
+        }
+    }
+    if let Some(ref text) = input.draft_response {
+        if text.len() > MAX_TEXT_BYTES {
+            return Err(format!(
+                "Resource limit exceeded: draft_response size {} bytes > MAX_TEXT_BYTES {}",
+                text.len(),
+                MAX_TEXT_BYTES
+            ));
+        }
+    }
+
+    // ── Audit phase detection ─────────────────────────────────────────────────
+    // "plan" = validate plan structure only; coverage_ratio not penalized.
+    // "execution" = validate plan + execution coverage.
+    // Auto-detect: no executed_steps → plan phase.
+    let resolved_phase = match input.audit_phase.as_deref() {
+        Some("plan") => "plan",
+        Some("execution") => "execution",
+        Some(other) => {
+            return Err(format!(
+                "Invalid audit_phase '{}'. Accepted values: plan, execution.",
+                other
+            ));
+        }
+        None => {
+            if input.executed_steps.is_empty() && !input.planned_tasks.is_empty() {
+                "plan"
+            } else {
+                "execution"
+            }
+        }
+    };
+    let is_plan_phase = resolved_phase == "plan";
 
     let mut violations: Vec<AuditViolation> = Vec::new();
     let mut critical_violations = Vec::new();
@@ -220,14 +306,125 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
 
     // 2. Plan DAG Verification (Standard: 0.15, Quick: 0.25)
     let dag_report = if !input.planned_tasks.is_empty() {
-        let mut dag = PlanDag::new();
+        // ── Pre-validate task fields before inserting into DAG ────────────────
+        let mut seen_ids: std::collections::HashSet<&str> = std::collections::HashSet::new();
         for t in &input.planned_tasks {
-            dag.add_task(&t.id, &t.name, t.dependencies.clone());
+            let id_trimmed = t.id.trim();
+            let name_trimmed = t.name.trim();
+
+            if id_trimmed.is_empty() {
+                add_violation(
+                    &mut violations,
+                    &mut critical_violations,
+                    &mut recommendations,
+                    "INVALID_TASK_ID",
+                    "Schema Violation: A task has an empty or whitespace-only ID.".to_string(),
+                    ViolationSeverity::Critical,
+                    "Assign a non-empty, unique identifier to every task in the plan.",
+                );
+                continue;
+            }
+            if id_trimmed.len() > MAX_TASK_ID_LEN {
+                add_violation(
+                    &mut violations,
+                    &mut critical_violations,
+                    &mut recommendations,
+                    "INVALID_TASK_ID",
+                    format!(
+                        "Schema Violation: Task ID '{}' exceeds max length {} chars.",
+                        id_trimmed, MAX_TASK_ID_LEN
+                    ),
+                    ViolationSeverity::Critical,
+                    "Shorten task IDs to 64 characters or fewer.",
+                );
+                continue;
+            }
+            if name_trimmed.is_empty() {
+                add_violation(
+                    &mut violations,
+                    &mut critical_violations,
+                    &mut recommendations,
+                    "INVALID_TASK_NAME",
+                    format!(
+                        "Schema Violation: Task '{}' has an empty or whitespace-only name.",
+                        id_trimmed
+                    ),
+                    ViolationSeverity::Critical,
+                    "Assign a non-empty description to every task.",
+                );
+                continue;
+            }
+            if name_trimmed.len() > MAX_TASK_NAME_LEN {
+                add_violation(
+                    &mut violations,
+                    &mut critical_violations,
+                    &mut recommendations,
+                    "INVALID_TASK_NAME",
+                    format!(
+                        "Schema Violation: Task '{}' name exceeds max length {} chars.",
+                        id_trimmed, MAX_TASK_NAME_LEN
+                    ),
+                    ViolationSeverity::Critical,
+                    "Shorten task names to 256 characters or fewer.",
+                );
+                continue;
+            }
+            if !seen_ids.insert(id_trimmed) {
+                add_violation(
+                    &mut violations,
+                    &mut critical_violations,
+                    &mut recommendations,
+                    "DUPLICATE_TASK_ID",
+                    format!(
+                        "Schema Violation: Duplicate task ID '{}' detected in plan DAG.",
+                        id_trimmed
+                    ),
+                    ViolationSeverity::Critical,
+                    "Every task must have a unique ID. Remove or rename the duplicate.",
+                );
+            }
+        }
+
+        let mut dag = PlanDag::new();
+        // Build a set of IDs that appeared more than once — exclude them from the DAG
+        // to avoid silently overwriting the first definition with the second.
+        let mut id_counts: std::collections::HashMap<&str, usize> = std::collections::HashMap::new();
+        for t in &input.planned_tasks {
+            let id_trimmed = t.id.trim();
+            if !id_trimmed.is_empty() {
+                *id_counts.entry(id_trimmed).or_insert(0) += 1;
+            }
+        }
+        for t in &input.planned_tasks {
+            let id_trimmed = t.id.trim();
+            let name_trimmed = t.name.trim();
+            // Only insert unique, non-empty, valid-length tasks
+            if !id_trimmed.is_empty()
+                && !name_trimmed.is_empty()
+                && id_trimmed.len() <= MAX_TASK_ID_LEN
+                && name_trimmed.len() <= MAX_TASK_NAME_LEN
+                && id_counts.get(id_trimmed).copied().unwrap_or(0) == 1
+            {
+                dag.add_task(id_trimmed, name_trimmed, t.dependencies.clone());
+            }
+        }
+
+        // ── Structural validation: unknown deps + cycles ──────────────────────
+        if let Err(err) = dag.validate_graph() {
+            add_violation(
+                &mut violations,
+                &mut critical_violations,
+                &mut recommendations,
+                "DAG_STRUCTURAL_ERROR",
+                format!("DAG Structural Violation: {}", err),
+                ViolationSeverity::Critical,
+                "Fix cycle or unknown dependency reference in planned_tasks before executing.",
+            );
         }
 
         for step in &input.executed_steps {
             if let Err(err) = dag.record_step(step) {
-                if err.contains("Dependency violation") {
+                if err.contains("Dependency violation") || err.contains("Unknown dependency") {
                     add_violation(
                         &mut violations,
                         &mut critical_violations,
@@ -267,7 +464,8 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
             );
         }
 
-        if is_deep && metrics.coverage_ratio < 1.0 && !input.executed_steps.is_empty() {
+        // Coverage check only applies in execution phase (not plan-only phase)
+        if !is_plan_phase && is_deep && metrics.coverage_ratio < 1.0 && !input.executed_steps.is_empty() {
             add_violation(
                 &mut violations,
                 &mut critical_violations,
@@ -283,14 +481,21 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
         }
 
         let weight = if is_quick { 0.25 } else { 0.15 };
+        // In plan phase with no executed steps, coverage = 1.0 (neutral — not penalized).
+        let dag_score = if is_plan_phase && input.executed_steps.is_empty() {
+            100.0
+        } else {
+            metrics.coverage_ratio * 100.0
+        };
         weighted_scores.push(WeightedScore {
-            score: metrics.coverage_ratio * 100.0,
+            score: dag_score,
             weight,
         });
         Some(metrics)
     } else {
         None
     };
+
 
     // 3. Text & Epistemic Calibration Evaluation
     let (text_report, confidence_report) = if let Some(ref text) = input.draft_response {
@@ -623,6 +828,7 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
         severity_summary,
         math_breakdown: json!({
             "mode": mode_str,
+            "audit_phase": resolved_phase,
             "constraints": constraint_report,
             "dag": dag_report,
             "text": text_report,

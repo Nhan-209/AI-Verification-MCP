@@ -5,7 +5,7 @@
 [![Rust CI/CD](https://github.com/Nhan-209/mcp-plugin-math/actions/workflows/ci.yml/badge.svg)](https://github.com/Nhan-209/mcp-plugin-math/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Protocol: MCP 2024-11-05](https://img.shields.io/badge/MCP-2024--11--05-brightgreen.svg)](https://modelcontextprotocol.io)
-[![Version: 0.8.0](https://img.shields.io/badge/version-0.8.0-orange.svg)](Cargo.toml)
+[![Version: 0.9.0](https://img.shields.io/badge/version-0.9.0-orange.svg)](Cargo.toml)
 
 An ultra-high-performance **Model Context Protocol (MCP)** Server written in **Rust** that serves as a **Deterministic Evidence & Policy Enforcement Layer for AI Agents**. It evaluates proposed AI actions, plans, diffs, and draft responses against deterministic signals, AST analysis, and curated provenance registries, enforcing 4-tier governance decisions (**`ALLOW`**, **`WARN`**, **`BLOCK`**, **`INSUFFICIENT_EVIDENCE`**) with machine-readable violation codes and actionable remediation advice.
 
@@ -142,14 +142,14 @@ All tools feature 100% backward-compatible aliases for legacy `math_*` clients.
 
 | Primary Tool Name | Legacy Alias | Type | Description |
 |---|---|---|---|
-| **`verify_agent`** | `math_audit_cognition`, `ai_audit_cognition` | **Unified Gate** | 6-Pillar verification engine. Returns 3-tier decision (`ALLOW`/`WARN`/`BLOCK`), structured violations, and remediation plan. Supports `quick`, `standard`, `deep` modes. |
-| **`verify_dag`** | `math_track_dag` | Diagnostic | Tracks execution on Directed Acyclic Graphs. Detects cycles, dependency errors, and isolates justified exploratory steps. |
-| **`verify_code`** | `math_eval_code` | Diagnostic | Computes Tree-sitter AST, McCabe Cyclomatic Complexity, Halstead measures, Maintainability Index, and boundary warnings across 7 languages. |
+| **`verify_agent`** | `math_audit_cognition`, `ai_audit_cognition` | **Unified Gate** | 6-Pillar verification engine. Returns **4-tier decision** (`ALLOW`/`WARN`/`BLOCK`/`INSUFFICIENT_EVIDENCE`), structured violations, and remediation plan. Supports `quick`, `standard`, `deep` modes and `audit_phase` (`plan`/`execution`). |
+| **`verify_dag`** | `math_track_dag` | Diagnostic | Tracks execution on Directed Acyclic Graphs. Detects cycles, unknown dependency references, duplicate task IDs, and isolates justified exploratory steps. |
+| **`verify_code`** | `math_eval_code` | Diagnostic | Computes Tree-sitter AST, McCabe Cyclomatic Complexity, approximate Halstead measures, Maintainability Index, and boundary warnings across 7 languages. |
 | **`verify_diff`** | `math_eval_diff` | Diagnostic | Analyzes diffs via LCS, calculating change ratio, complexity deltas ($\Delta M$, $\Delta\text{MI}$), touched functions, and regression risk. |
 | **`verify_text`** | `math_eval_text` | Diagnostic | Analyzes Shannon entropy, information density, compression ratio, Flesch readability, and conversational padding. |
 | **`verify_confidence`** | `math_confidence` | Diagnostic | Epistemic calibration gate. Detects ungrounded overconfidence while whitelisting empirical metrics and specification contracts. |
-| **`verify_research`** | `math_audit_research` | Diagnostic | Analyzes technical claims (benchmarks, versions, APIs), verifies evidence (RFCs, URLs, test logs), and flags research deficits. |
-| **`verify_foresight`** | `math_eval_foresight` | Diagnostic | Evaluates defensive error handling, edge cases, verification strategy, and flags lazy plans. |
+| **`verify_research`** | `math_audit_research` | Diagnostic | Analyzes technical claims (benchmarks, versions, APIs). RFC identifiers are checked against a curated registry of 70+ published IETF RFCs (not a permissive numeric range). Authoritative domains validated by hostname boundary. |
+| **`verify_foresight`** | `math_eval_foresight` | Diagnostic | Evaluates defensive error handling, edge cases, verification strategy, and flags lazy plans. Note: this is a **prose foresight score**, not an execution artifact verifier. |
 | **`verify_constraints`** | `math_verify_constraints` | Diagnostic | Evaluates requirement fulfillment using n-gram Jaccard matching and dynamic negation contradiction analysis. |
 
 ---

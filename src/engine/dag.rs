@@ -130,13 +130,23 @@ impl PlanDag {
     /// Records an execution step and validates it against dependencies and approved scope.
     pub fn record_step(&mut self, task_id: &str) -> Result<String, String> {
         if let Some(task) = self.tasks.get(task_id) {
-            // Check dependencies
-            for dep_id in &task.dependencies {
-                if let Some(dep_task) = self.tasks.get(dep_id) {
-                    if dep_task.status != TaskStatus::Completed {
+            // Check dependencies — error immediately on unknown or incomplete dep.
+            // Unknown deps should be caught by validate_graph() first, but we defend in depth.
+            let dep_ids: Vec<String> = task.dependencies.clone();
+            for dep_id in &dep_ids {
+                match self.tasks.get(dep_id) {
+                    Some(dep_task) => {
+                        if dep_task.status != TaskStatus::Completed {
+                            return Err(format!(
+                                "Dependency violation: Task '{}' executed before dependency '{}' was completed",
+                                task_id, dep_id
+                            ));
+                        }
+                    }
+                    None => {
                         return Err(format!(
-                            "Dependency violation: Task '{}' executed before dependency '{}' was completed",
-                            task_id, dep_id
+                            "Unknown dependency '{}' referenced by task '{}': not in plan DAG",
+                            dep_id, task_id
                         ));
                     }
                 }

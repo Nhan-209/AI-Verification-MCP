@@ -31,7 +31,7 @@ jobs:
         uses: Swatinem/rust-cache@v2
 
       - name: Format Code
-        run: cargo fmt
+        run: cargo fmt --all -- --check
 
       - name: Clippy Default Features
         run: cargo clippy --all-targets -- -D warnings
