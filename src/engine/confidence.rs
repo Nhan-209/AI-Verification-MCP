@@ -94,8 +94,7 @@ impl ConfidenceAnalyzer {
                 || word.starts_with("http://")
                 || word.starts_with("https://")
                 || word.contains('_')
-                || (word.chars().any(|c| c.is_uppercase())
-                    && word.chars().any(|c| c.is_lowercase()))
+                || (word.len() > 1 && word.chars().skip(1).any(|c| c.is_uppercase()))
             {
                 specific_items += 1.0;
             }
@@ -195,12 +194,12 @@ impl ConfidenceAnalyzer {
         }
         let filler_penalty = (filler_count * 0.1f64).min(1.0f64);
 
-        let mut confidence_score = 0.35 * assertion_density
-            + 0.30 * specificity
+        let base_confidence = 0.40 * assertion_density
+            + 0.25 * specificity
             + 0.25 * (1.0 - contradiction_penalty)
             + 0.10 * (1.0 - filler_penalty);
 
-        confidence_score = confidence_score.clamp(0.0, 1.0);
+        let confidence_score = (base_confidence * (1.0 - 0.5 * hedging_ratio)).clamp(0.0, 1.0);
 
         let verdict = if confidence_score > 0.75 {
             "HIGH_CONFIDENCE".to_string()
