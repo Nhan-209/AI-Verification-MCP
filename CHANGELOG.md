@@ -1,10 +1,33 @@
-﻿# CHANGELOG
+# CHANGELOG
 
 All notable changes to `ai-verification-mcp` are documented here.
 
 ---
 
+## [0.9.1] — 2026-09-06 — Anti-Phase Spoofing Guard + MCP Revision 2026-07-28
+
+### Added
+- **Anti-Phase Spoofing Guard (`PHASE_SPOOFING`)**:
+  - Closed the phase evasion loophole where agents could submit `audit_phase='plan'` to bypass execution coverage while smuggling implementation code or claiming task completion.
+  - Supplying `executed_steps` under `audit_phase='plan'` now triggers `PHASE_SPOOFING` (Critical $\rightarrow$ `BLOCK`).
+  - Supplying `code_snippet` under `audit_phase='plan'` triggers `PHASE_SPOOFING` (Critical $\rightarrow$ `BLOCK`).
+  - Completion claims in `draft_response` under `audit_phase='plan'` trigger `PHASE_SPOOFING` (Critical $\rightarrow$ `BLOCK`).
+- **Explicit Delivery Authorization Contract (`is_delivery_authorized`)**:
+  - Added `is_delivery_authorized: bool` to `UnifiedAuditReport` and `math_breakdown`.
+  - Under `audit_phase='plan'`, `is_delivery_authorized` is strictly `false` and passing verdict is `"PLAN_APPROVED"` (never `"PASS"`).
+  - Only a passing audit under `audit_phase='execution'` grants `is_delivery_authorized: true` and `verdict: "PASS"`.
+- **MCP Revision 2026-07-28 Support**:
+  - Implemented the modern stateless protocol revision `"2026-07-28"` alongside legacy `"2024-11-05"`.
+  - **Stateless Discovery (`server/discover`)**: Now returns the complete discovery manifest (protocolVersion `2026-07-28`, `supportedProtocolVersions`, `capabilities`, embedded `tools` array with all 9 tool schemas, `resources`, `prompts`) in a single roundtrip.
+  - **Version Negotiation (`initialize`)**: Dynamically negotiates `protocolVersion` matching client requests (`2026-07-28` vs `2024-11-05`), defaulting to `2026-07-28`.
+- **Tests**:
+  - Added 5 new security invariants in `tests/security_invariants.rs` for phase spoofing, code smuggling, completion claiming, and delivery authorization.
+  - Added integration tests in `tests/mcp_integration.rs` for `server/discover` 2026-07-28 manifest and `initialize` version negotiation.
+
+---
+
 ## [0.9.0] — 2026-09-06 — DAG Structural Hardening + Audit Phase Separation
+
 
 ### Added
 - **`audit_phase` field** in `UnifiedAuditInput`: `"plan"` | `"execution"`. Auto-detected when omitted — if `executed_steps` is empty and `planned_tasks` is present, phase defaults to `"plan"`. Exposed in `math_breakdown.audit_phase` output field.

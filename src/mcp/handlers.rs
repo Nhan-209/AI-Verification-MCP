@@ -30,23 +30,57 @@ pub fn handle_request(req: JsonRpcRequest) -> Option<JsonRpcResponse> {
     }
 
     let response = match method {
-        "initialize" | "server/discover" => JsonRpcResponse {
+        "initialize" => {
+            let params = req.params.unwrap_or(Value::Null);
+            let requested_version = params
+                .get("protocolVersion")
+                .and_then(|v| v.as_str())
+                .unwrap_or("2026-07-28");
+            let negotiated_version = match requested_version {
+                "2024-11-05" => "2024-11-05",
+                _ => "2026-07-28",
+            };
+            JsonRpcResponse {
+                jsonrpc: "2.0".to_string(),
+                id,
+                result: Some(json!({
+                    "protocolVersion": negotiated_version,
+                    "supportedProtocolVersions": ["2026-07-28", "2024-11-05"],
+                    "capabilities": {
+                        "tools": { "listChanged": false },
+                        "resources": { "subscribe": false, "listChanged": false },
+                        "prompts": { "listChanged": false }
+                    },
+                    "serverInfo": {
+                        "name": "ai-verification-mcp",
+                        "version": env!("CARGO_PKG_VERSION")
+                    }
+                })),
+                error: None,
+            }
+        }
+        "server/discover" => JsonRpcResponse {
             jsonrpc: "2.0".to_string(),
             id,
             result: Some(json!({
-                "protocolVersion": "2024-11-05",
-                "capabilities": {
-                    "tools": {},
-                    "resources": {},
-                    "prompts": {}
-                },
+                "protocolVersion": "2026-07-28",
+                "supportedProtocolVersions": ["2026-07-28", "2024-11-05"],
                 "serverInfo": {
                     "name": "ai-verification-mcp",
                     "version": env!("CARGO_PKG_VERSION")
-                }
+                },
+                "capabilities": {
+                    "tools": { "listChanged": false },
+                    "resources": { "subscribe": false, "listChanged": false },
+                    "prompts": { "listChanged": false }
+                },
+                "tools": get_available_tools(),
+                "resources": [],
+                "prompts": []
             })),
             error: None,
         },
+
         "ping" => JsonRpcResponse {
             jsonrpc: "2.0".to_string(),
             id,

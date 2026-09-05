@@ -290,3 +290,78 @@ fn test_integration_unknown_tool_and_method() {
     let res2 = handle_request(bad_method_req).expect("Must return response");
     assert_eq!(res2.error.unwrap().code, -32601);
 }
+
+#[test]
+fn test_integration_mcp_2026_07_28_server_discover() {
+    let req = JsonRpcRequest {
+        jsonrpc: "2.0".to_string(),
+        id: Some(json!(500)),
+        method: "server/discover".to_string(),
+        params: None,
+    };
+    let res = handle_request(req).expect("server/discover must respond");
+    assert_eq!(res.jsonrpc, "2.0");
+    assert_eq!(res.id, Some(json!(500)));
+    assert!(res.error.is_none());
+
+    let val = res.result.expect("Discovery result must be present");
+    assert_eq!(val["protocolVersion"], "2026-07-28");
+    assert_eq!(val["supportedProtocolVersions"], json!(["2026-07-28", "2024-11-05"]));
+    assert_eq!(val["serverInfo"]["name"], "ai-verification-mcp");
+
+    // In MCP 2026-07-28, server/discover includes tools array directly in the manifest
+    let tools = val["tools"]
+        .as_array()
+        .expect("Tools must be present in discovery response");
+    assert_eq!(tools.len(), 9, "Discovery manifest must contain all 9 tools");
+    assert!(tools.iter().any(|t| t["name"] == "verify_agent"));
+}
+
+#[test]
+fn test_integration_initialize_version_negotiation() {
+    // 1. Client requesting 2024-11-05 receives 2024-11-05
+    let req_legacy = JsonRpcRequest {
+        jsonrpc: "2.0".to_string(),
+        id: Some(json!(501)),
+        method: "initialize".to_string(),
+        params: Some(json!({
+            "protocolVersion": "2024-11-05",
+            "capabilities": {},
+            "clientInfo": { "name": "legacy-client", "version": "1.0" }
+        })),
+    };
+    let res_legacy = handle_request(req_legacy).expect("initialize must respond");
+    assert_eq!(res_legacy.result.unwrap()["protocolVersion"], "2024-11-05");
+
+    // 2. Client requesting 2026-07-28 receives 2026-07-28
+    let req_modern = JsonRpcRequest {
+        jsonrpc: "2.0".to_string(),
+        id: Some(json!(502)),
+        method: "initialize".to_string(),
+        params: Some(json!({
+            "protocolVersion": "2026-07-28",
+            "capabilities": {},
+            "clientInfo": { "name": "modern-client", "version": "2.0" }
+        })),
+    };
+    let res_modern = handle_request(req_modern).expect("initialize must respond");
+    let modern_val = res_modern.result.unwrap();
+    assert_eq!(modern_val["protocolVersion"], "2026-07-28");
+    assert_eq!(
+        modern_val["supportedProtocolVersions"],
+        json!(["2026-07-28", "2024-11-05"])
+    );
+
+    // 3. Client without protocolVersion defaults to 2026-07-28
+    let req_default = JsonRpcRequest {
+        jsonrpc: "2.0".to_string(),
+        id: Some(json!(503)),
+        method: "initialize".to_string(),
+        params: Some(json!({
+            "capabilities": {},
+            "clientInfo": { "name": "unspecified-client", "version": "1.0" }
+        })),
+    };
+    let res_default = handle_request(req_default).expect("initialize must respond");
+    assert_eq!(res_default.result.unwrap()["protocolVersion"], "2026-07-28");
+}
