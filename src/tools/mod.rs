@@ -4,7 +4,9 @@ pub mod code_evaluator;
 pub mod confidence_checker;
 pub mod constraint_checker;
 pub mod diff_checker;
+pub mod foresight_checker;
 pub mod plan_tracker;
+pub mod research_checker;
 pub mod text_evaluator;
 pub mod unified_audit;
 
@@ -12,7 +14,9 @@ pub use code_evaluator::execute_code_evaluator;
 pub use confidence_checker::execute_confidence_checker;
 pub use constraint_checker::execute_constraint_checker;
 pub use diff_checker::execute_diff_checker;
+pub use foresight_checker::execute_foresight_checker;
 pub use plan_tracker::execute_plan_tracker;
+pub use research_checker::execute_research_checker;
 pub use text_evaluator::execute_text_evaluator;
 pub use unified_audit::execute_unified_audit;
 
@@ -23,7 +27,7 @@ pub fn get_available_tools() -> Vec<Tool> {
     vec![
         Tool {
             name: "math_audit_cognition".to_string(),
-            description: "Unified Mathematical Metacognition Gate. Verifies user requirement alignment, plan DAG adherence, text entropy/verbosity/confidence, and code metrics (McCabe, Halstead, Maintainability Index, boundary conditions) all in one call.".to_string(),
+            description: "Unified Mathematical Metacognition Gate (6-Pillar Audit). Verifies requirement alignment, plan DAG diligence, text density/entropy, epistemic calibration, empirical research grounding, and proactive foresight all in one call.".to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {
@@ -129,13 +133,37 @@ pub fn get_available_tools() -> Vec<Tool> {
         },
         Tool {
             name: "math_confidence".to_string(),
-            description: "Evaluates AI draft responses for metacognitive confidence, hedging ratio, assertion density, specificity (paths, code blocks, metrics), and self-contradictions.".to_string(),
+            description: "Epistemic Calibration Gate. Evaluates draft text for overconfidence, unverified certainty claims, hedging ratio, assertion density, and self-contradictions.".to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {
                     "text": { "type": "string", "description": "AI response text to evaluate" }
                 },
                 "required": ["text"]
+            }),
+        },
+        Tool {
+            name: "math_audit_research".to_string(),
+            description: "Forces research and factual grounding. Scans text for technical claims, checks for empirical citations (URLs, RFCs, paths, logs), and flags research deficits.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "text": { "type": "string", "description": "Response text to audit for research grounding" }
+                },
+                "required": ["text"]
+            }),
+        },
+        Tool {
+            name: "math_eval_foresight".to_string(),
+            description: "Evaluates proactive foresight: defensive error handling, boundary/edge case coverage, verification strategy, and flags lazy shallow plans.".to_string(),
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "text": { "type": "string", "description": "Plan or draft explanation text" },
+                    "code": { "type": "string", "description": "Source code snippet (optional)" },
+                    "requirements_count": { "type": "integer", "description": "Total user requirements count" },
+                    "planned_tasks_count": { "type": "integer", "description": "Total planned DAG tasks count" }
+                }
             }),
         },
         Tool {

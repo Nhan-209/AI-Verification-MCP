@@ -76,11 +76,8 @@ impl TextEvaluator {
             };
         }
 
-        let sentence_count = cleaned
-            .split(['.', '!', '?', '\n'])
-            .filter(|s| !s.trim().is_empty())
-            .count()
-            .max(1);
+        let sentences = crate::engine::text_utils::smart_split_sentences(cleaned);
+        let sentence_count = sentences.len().max(1);
 
         // Word frequency & Shannon entropy
         let mut freq_map = HashMap::new();
@@ -126,25 +123,9 @@ impl TextEvaluator {
         // Information Density = Entropy * TTR
         let information_density = shannon_entropy_bits * type_token_ratio;
 
-        // AI filler phrases check
-        const AI_FILLER_PHRASES: &[&str] = &[
-            "as an ai",
-            "i'd be happy to",
-            "let me explain",
-            "certainly!",
-            "of course!",
-            "great question",
-            "i understand",
-            "absolutely",
-            "sure thing",
-            "here's what i",
-            "i'll help you",
-            "let me help",
-        ];
-
         let lower_cleaned = cleaned.to_lowercase();
         let mut filler_count = 0;
-        for &filler in AI_FILLER_PHRASES {
+        for &filler in crate::engine::text_utils::AI_FILLER_PHRASES {
             filler_count += lower_cleaned.matches(filler).count();
         }
         let filler_ratio = filler_count as f64 / sentence_count as f64;

@@ -5,9 +5,9 @@
 [![Rust CI/CD](https://github.com/Nhan-209/mcp-plugin-math/actions/workflows/ci.yml/badge.svg)](https://github.com/Nhan-209/mcp-plugin-math/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Protocol: MCP 2024-11-05](https://img.shields.io/badge/MCP-2024--11--05-brightgreen.svg)](https://modelcontextprotocol.io)
-[![Version: 0.2.0](https://img.shields.io/badge/version-0.2.0-orange.svg)](Cargo.toml)
+[![Version: 0.3.0](https://img.shields.io/badge/version-0.3.0-orange.svg)](Cargo.toml)
 
-Một **Model Context Protocol (MCP)** Server hiệu năng cực cao viết bằng **Rust**, giúp các AI Agent triệt tiêu ảo giác (hallucinations), ngăn ngừa lệch phạm vi (scope creep), kiểm soát độ dài dòng, đánh giá mức độ tự tin, phân tích rủi ro suy thoái mã nguồn và đảm bảo mã nguồn đạt chuẩn sản phẩm thông qua **các chứng minh toán học tất định và hệ thống chỉ số phần mềm hình thức**.
+Một **Model Context Protocol (MCP)** Server hiệu năng cực cao viết bằng **Rust**, giúp các AI Agent triệt tiêu ảo giác (hallucinations), ngăn ngừa lệch phạm vi (scope creep), kiểm soát độ dài dòng, hiệu chuẩn mức độ tự tin (anti-overconfidence), bắt buộc nghiên cứu thực nghiệm (Research Gate), chủ động lường trước lỗi và ca biên (Foresight Engine) thông qua **các chứng minh toán học tất định và hệ thống chỉ số phần mềm hình thức**.
 
 ---
 
@@ -17,8 +17,9 @@ Các Mô hình Ngôn ngữ Lớn (LLM) bản chất là các bộ dự đoán to
 1. **Ảo giác & Lạc đề (Hallucination)**: Tự bịa dữ kiện hoặc trôi dạt xa khỏi ý định ban đầu của người dùng.
 2. **Làm thừa việc ($W > 0$)**: Tự ý code những thứ không ai yêu cầu, gây phình to codebase.
 3. **Dài dòng & Sáo rỗng**: Trả lời bằng nhiều câu đệm khách sáo, lặp từ, mật độ thông tin nghèo nàn.
-4. **Tự tin giả tạo (False Confidence)**: Khẳng định những điều không có cơ sở hoặc dùng quá nhiều từ do dự mơ hồ.
-5. **Rủi ro hồi quy mã nguồn (Regressions)**: Thay đổi code làm tăng đột biến độ phức tạp hoặc phát sinh lỗi tiềm ẩn.
+4. **Tự tin thái quá (Overconfidence)**: Tuyên bố "chắc chắn 100%", "đảm bảo không lỗi" khi không hề có dữ liệu thực nghiệm.
+5. **Lười nghiên cứu (Research Deficit)**: Đoán mò tính năng thư viện, phiên bản, thông số thay vì trích dẫn tài liệu chính thống.
+6. **Lập kế hoạch nông cạn (Lazy Plan)**: Chỉ nghĩ đến trường hợp lý tưởng (happy path), bỏ qua xử lý lỗi, trường hợp biên và kiểm thử.
 
 `mcp-plugin-math` đóng vai trò là một **Cổng Siêu Nhận Thức Toán Học (Mathematical Metacognition Gate)**. Trước khi phản hồi hoặc bàn giao mã, AI sẽ tự kiểm toán hành vi của mình qua các mô hình toán học chặt chẽ.
 
@@ -35,45 +36,51 @@ Mọi kế hoạch thực thi được mô hình hóa thành một DAG $G = (V, 
   Bất kỳ hành động nào nằm ngoài kế hoạch đã duyệt sẽ kích hoạt ngay **Vi Phạm Phạm Vi ($W > 0$)**.
 - **Bất biến tô pô (Topological Invariants)**: Đảm bảo các tác vụ phụ thuộc chỉ được phép thực hiện khi tác vụ tiên quyết đã hoàn tất.
 
-### 2. Lý Thuyết Thông Tin & Mật Độ Ngôn Ngữ
+### 2. Lý Thuyết Thông Tin & Tách Câu Thông Minh Song Ngữ
 - **Shannon Entropy**:
   $$H(X) = -\sum_{x} p(x) \log_2 p(x)$$
-- **Mật độ thông tin**: $D = H(X) \times \text{TTR}$ (Type-Token Ratio). Phát hiện văn bản sáo rỗng hoặc lặp lại.
-- **Xấp xỉ độ phức tạp Kolmogorov**: Tỷ lệ nén qua thuật toán Gzip lọc bỏ các nội dung dư thừa, ít thông tin.
-- **Nhận diện cụm từ đệm AI & Ước tính độ dài tối ưu**: Phát hiện câu chào đệm khách sáo ("As an AI...", "I'd be happy to...") và tính toán độ dài văn bản tối ưu dựa trên điểm bão hòa entropy.
-- **Chỉ số khả năng đọc**: Flesch Reading Ease và Gunning Fog Index kiểm soát văn bản luôn rõ ràng, dễ hiểu.
+- **Mật độ thông tin**: $D = H(X) \times \text{TTR}$ (Type-Token Ratio).
+- **Bộ tách câu thông minh (`text_utils.rs`)**: Bảo toàn trọn vẹn URL (`github.com/...`), phiên bản (`v1.2.3`), số thập phân (`3.14`), chữ viết tắt (`e.g.`, `vd.`), không gây vụn vặt câu văn.
+- **Từ điển câu đệm AI song ngữ EN/VI**: Nhận diện câu đệm khách sáo trong cả tiếng Anh và tiếng Việt.
 
-### 3. Đánh Giá Mức Độ Tự Tin Siêu Nhận Thức (Metacognitive Confidence)
-- **Tỷ lệ do dự (Hedging Ratio)**: Đo lường tần suất xuất hiện các từ ngữ mơ hồ (*maybe*, *probably*, *I think*, *might*).
-- **Mật độ khẳng định (Assertion Density)**: $A = 1 - H$, thể hiện các khẳng định chắc chắn, có căn cứ.
-- **Chỉ số cụ thể (Specificity Score)**: Đo lường sự hiện diện của dẫn chứng thực nghiệm (đoạn mã, đường dẫn tệp, số liệu, URL).
-- **Tự mâu thuẫn nội tại**: Tự động phát hiện các phát biểu xung đột lẫn nhau ngay trong câu trả lời.
+### 3. Hiệu Chuẩn Nhận Thức & Chống Tự Tin Thái Quá (Epistemic Calibration)
+- **Chỉ số hiệu chuẩn (Calibration Index)**: Phạt nặng các khẳng định tuyệt đối hóa ("chắc chắn 100%", "đảm bảo hoàn hảo", "guaranteed") nếu không có dữ liệu thực nghiệm đi kèm.
+- **Phân loại nhận thức**:
+  - `CALIBRATED`: Tự tin trên cơ sở thực nghiệm, lập luận vững chắc.
+  - `OVERCONFIDENT`: Khẳng định bừa bãi, dùng từ ngữ tuyệt đối hóa nhưng thiếu bằng chứng.
+  - `UNDERCONFIDENT`: Hàm lượng kỹ thuật cao nhưng do dự không cần thiết.
+  - `EVASIVE`: Trả lời né tránh, vòng vo, toàn câu đệm mơ hồ.
 
-### 4. Độ Phức Tạp Phần Mềm, AST & Phân Tích Khác Biệt (Diff)
-- **Độ phức tạp Cyclomatic McCabe**: $M = E - N + 2P$. Cảnh báo khi mật độ rẽ nhánh quá cao ($M > 20$).
-- **Chỉ số Halstead**: Đo lường Thể tích chương trình ($V$), Độ khó ($D$), Nỗ lực lập trình ($E$) và Số lỗi ước tính ($B = \frac{V}{3000}$).
-- **Chỉ số khả năng bảo trì (Maintainability Index - MI)**:
-  $$\text{MI} = 171 - 5.2 \ln(V) - 0.23 M - 16.2 \ln(\text{LOC})$$
-- **Phân tích Cây cú pháp Trừu tượng (AST Tree-sitter)**: Hỗ trợ đa ngôn ngữ qua Cargo feature flags (**Rust**, **TypeScript/JavaScript**, **Python**, **Go**, **Java**, **C**, **C++**).
-- **Phân tích rủi ro suy thoái (Diff Analysis via LCS)**: So sánh sự thay đổi code trước/sau qua dãy con chung dài nhất, tính toán biến thiên độ phức tạp ($\Delta M$, $\Delta\text{MI}$), các hàm bị ảnh hưởng và chỉ số rủi ro tổng hợp.
-- **Phát hiện rủi ro biên**: Cảnh báo unhandled `.unwrap()`, mảng chưa kiểm tra độ dài đã truy xuất `[0]`, bare `except:`, kiểu dữ liệu lỏng lẻo `any`, rò rỉ bộ nhớ `malloc` thiếu `free`, hàm C không an toàn.
+### 4. Cổng Kiểm Toán Nghiên Cứu Thực Nghiệm (Research Gate)
+- **Tỷ lệ dẫn chứng (Evidence Ratio)**: $E = \frac{\text{citations}}{\max(\text{factual\_claims}, 1)}$.
+- **Phát hiện thiếu hụt nghiên cứu (`RESEARCH_DEFICIT`)**: Nếu đưa ra các khẳng định về phiên bản, hiệu năng, API mà không có trích dẫn nguồn (URL, RFC, đường dẫn file, log kiểm thử) → Ép AI phải dừng lại tra cứu trước khi trả lời.
 
-### 5. Lý Thuyết Tập Hợp & Khớp Ngữ Nghĩa N-gram
-- **Khớp ràng buộc ngữ nghĩa (Semantic Matching)**: Ứng dụng hệ số tương đồng Jaccard trên n-gram ký tự $J(A, B) = \frac{|A \cap B|}{|A \cup B|}$ kết hợp đối soát từ vựng để nhận diện yêu cầu được thỏa mãn, không phụ thuộc vào chuỗi con thô.
-- **Phát hiện mâu thuẫn phủ định động**: Tự động phân tích các cấu trúc phủ định ("no X", "without X", "must not X") để tìm kiếm các mâu thuẫn logic phát sinh ($P \wedge \neg P \models \bot$).
+### 5. Tư Duy Tiên Liệu & Kỹ Thuật Phòng Ngừa (Foresight Engine)
+- **Thiết kế phòng thủ**: Kiểm tra sự hiện diện của cơ chế xử lý lỗi, timeout, fallback, retry logic.
+- **Bao phủ trường hợp biên**: Đánh giá xử lý mảng rỗng, giá trị tới hạn, tràn số, concurrency.
+- **Chống kế hoạch lười (`LAZY_PLAN`)**: Đối soát độ sâu kế hoạch với độ phức tạp của bài toán, ngăn ngừa việc lập kế hoạch 1 bước sơ sài.
+- **Độ phức tạp Cyclomatic McCabe**: $M = E - N + 2P \le 10$.
+- **Chỉ số bảo trì (Maintainability Index - MI)**: $MI \ge 65$.
+- **Phân tích rủi ro suy thoái (Diff Analysis via LCS)**: Đo lường biến thiên độ phức tạp trước khi commit code.
+
+### 6. Lý Thuyết Tập Hợp & Khớp Ngữ Nghĩa N-gram
+- **Khớp ràng buộc ngữ nghĩa (Semantic Matching)**: Tương đồng Jaccard trên n-gram ký tự $J(A, B) = \frac{|A \cap B|}{|A \cup B|}$ kết hợp đối soát từ vựng.
+- **Phát hiện mâu thuẫn phủ định động**: Tự động phân tích các cấu trúc phủ định ("không được X", "without X", "must not X") để tìm mâu thuẫn logic ($P \wedge \neg P \models \bot$).
 
 ---
 
-## 🛠️ Danh Sách MCP Tools Cung Cấp
+## 🛠️ Danh Sách 9 MCP Tools Cung Cấp
 
 | Tool Name | Loại | Chức Năng |
 |---|---|---|
-| **`math_audit_cognition`** | **Unified Gate** | Cổng kiểm toán siêu nhận thức toàn diện (Yêu cầu + Kế hoạch + Phản hồi nháp + Tự tin + Mã nguồn) với thuật toán tính điểm trọng số. Trả về phán quyết `PASS`/`FAIL` và danh sách khuyến nghị khắc phục. |
-| **`math_track_dag`** | Granular | Theo dõi và cập nhật tiến trình trên đồ thị DAG, phát hiện vi phạm thứ tự tô pô, chu trình và việc làm ngoài kế hoạch. |
-| **`math_eval_code`** | Granular | Phân tích AST, McCabe Cyclomatic, Halstead, Maintainability Index và các cảnh báo biên cho nhiều ngôn ngữ lập trình. |
-| **`math_eval_diff`** | Granular | Phân tích khác biệt mã nguồn trước/sau (LCS), đo lường tỷ lệ thay đổi, biến thiên độ phức tạp ($\Delta M$, $\Delta\text{MI}$), phạm vi hàm bị ảnh hưởng và điểm rủi ro hồi quy. |
+| **`math_audit_cognition`** | **Unified Gate** | Kiểm toán 6 trụ cột (Yêu cầu + Kế hoạch + Hiệu chuẩn nhận thức + Nghiên cứu + Tiên liệu + Code). Trả về phán quyết `PASS`/`FAIL` và danh sách khuyến nghị cụ thể. |
+| **`math_track_dag`** | Granular | Theo dõi và cập nhật tiến trình trên đồ thị DAG, phát hiện vi phạm thứ tự tô pô, chu trình và việc làm thừa. |
+| **`math_eval_code`** | Granular | Phân tích AST, McCabe Cyclomatic, Halstead, Maintainability Index và các cảnh báo biên cho 7 ngôn ngữ. |
+| **`math_eval_diff`** | Granular | Phân tích khác biệt mã nguồn (LCS), đo lường tỷ lệ thay đổi, biến thiên độ phức tạp ($\Delta M$, $\Delta\text{MI}$), danh sách hàm bị ảnh hưởng và điểm rủi ro hồi quy. |
 | **`math_eval_text`** | Granular | Đo lường Shannon entropy, mật độ thông tin, tỷ lệ nén, chỉ số khả năng đọc, phát hiện từ đệm AI và độ dài tối ưu. |
-| **`math_confidence`** | Granular | Đánh giá mức độ tự tin nhận thức, tỷ lệ ngập ngừng do dự, mật độ khẳng định, tính cụ thể và phát hiện tự mâu thuẫn trong văn bản. |
+| **`math_confidence`** | Granular | Cổng hiệu chuẩn nhận thức. Đánh giá mức độ tự tin thái quá, tuyên bố số liệu bừa bãi, tỷ lệ do dự và tự mâu thuẫn. |
+| **`math_audit_research`** | Granular | Ép AI nghiên cứu thực nghiệm. Rà soát các khẳng định kỹ thuật, kiểm tra trích dẫn (URL, RFC, file path, test log) và cảnh báo thiếu hụt nghiên cứu. |
+| **`math_eval_foresight`** | Granular | Đánh giá tư duy tiên liệu: xử lý lỗi phòng thủ, ca biên, chiến lược kiểm thử và phát hiện kế hoạch sơ sài (lazy plan). |
 | **`math_verify_constraints`** | Granular | Đối soát tập hợp yêu cầu với giải pháp thực tế bằng tương đồng Jaccard n-gram và phát hiện mâu thuẫn phủ định động. |
 
 ---
@@ -138,7 +145,7 @@ Trên Windows:
 
 Dự án bao gồm sẵn bộ quy tắc và kỹ năng tương thích hoàn toàn với các Agentic AI:
 - **Quy tắc P0 (`rules/math-verification.md`)**: Bắt buộc AI phải gọi tool `math_audit_cognition` trước khi xuất kết quả cho người dùng.
-- **Kỹ năng (`skills/math-metacognition/SKILL.md`)**: Hướng dẫn AI cách thiết lập đồ thị DAG, phân tích chỉ số và sửa chữa các vi phạm toán học.
+- **Kỹ năng (`skills/math-metacognition/SKILL.md`)**: Hướng dẫn AI cách thiết lập đồ thị DAG, hiệu chuẩn nhận thức, tra cứu nghiên cứu và lường trước lỗi tương lai.
 
 ---
 

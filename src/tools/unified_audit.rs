@@ -1,4 +1,7 @@
-use crate::engine::{CodeAnalyzer, ConfidenceAnalyzer, ConstraintEngine, PlanDag, TextEvaluator};
+use crate::engine::{
+    CodeAnalyzer, ConfidenceAnalyzer, ConstraintEngine, ForesightEngine, PlanDag, ResearchGate,
+    TextEvaluator,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
 
@@ -48,7 +51,7 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
     let mut recommendations = Vec::new();
     let mut weighted_scores: Vec<WeightedScore> = Vec::new();
 
-    // 1. Constraint Verification (Weight: 0.40)
+    // 1. Constraint Verification (Weight: 0.30)
     let constraint_report = if !input.user_requirements.is_empty() {
         let impl_claims: Vec<String> = input
             .executed_steps
@@ -81,14 +84,14 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
 
         weighted_scores.push(WeightedScore {
             score: rep.alignment_score * 100.0,
-            weight: 0.40,
+            weight: 0.30,
         });
         Some(rep)
     } else {
         None
     };
 
-    // 2. Plan DAG Verification (Weight: 0.20)
+    // 2. Plan DAG Verification (Weight: 0.15)
     let dag_report = if !input.planned_tasks.is_empty() {
         let mut dag = PlanDag::new();
         for t in &input.planned_tasks {
@@ -111,14 +114,14 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
 
         weighted_scores.push(WeightedScore {
             score: metrics.coverage_ratio * 100.0,
-            weight: 0.20,
+            weight: 0.15,
         });
         Some(metrics)
     } else {
         None
     };
 
-    // 3. Text & Information Theory Evaluation (Weight: 0.15)
+    // 3. Text & Epistemic Calibration Evaluation (Weight: 0.15)
     let (text_report, confidence_report) = if let Some(ref text) = input.draft_response {
         let rep = TextEvaluator::evaluate(text);
         if rep.is_verbose {
@@ -136,9 +139,14 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
         }
 
         let conf = ConfidenceAnalyzer::analyze(text);
-        if conf.verdict == "LOW_CONFIDENCE" {
+        if conf.verdict == "OVERCONFIDENT" {
+            critical_violations.push(
+                "Overconfidence Violation: Absolute claims ('guaranteed', '100%') made without proof. Moderate claims or provide citations."
+                    .to_string(),
+            );
+        } else if conf.verdict == "EVASIVE" {
             recommendations.push(
-                "Low Confidence Warning: Draft text displays high hedging or lack of specificity."
+                "Evasive Language Warning: Text displays excessive hedging. Provide grounded answers."
                     .to_string(),
             );
         }
@@ -146,13 +154,8 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
             critical_violations.push(format!("Self-Contradiction in Response: {}", c));
         }
 
-        let text_quality = if rep.is_verbose || rep.is_too_complex {
-            60.0
-        } else {
-            95.0
-        };
         weighted_scores.push(WeightedScore {
-            score: text_quality,
+            score: conf.calibration_score * 100.0,
             weight: 0.15,
         });
         (Some(rep), Some(conf))
@@ -160,7 +163,54 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
         (None, None)
     };
 
-    // 4. Code Metrics Evaluation (Weight: 0.25)
+    // 4. Research Gate Evaluation (Weight: 0.10)
+    let research_report = if let Some(ref text) = input.draft_response {
+        let r_rep = ResearchGate::audit(text);
+        if r_rep.has_research_deficit {
+            critical_violations.push(
+                "Research Deficit: Factual technical assertions made without citations. Verify with docs, RFCs, or test logs."
+                    .to_string(),
+            );
+        }
+        for rec in &r_rep.recommendations {
+            recommendations.push(rec.clone());
+        }
+
+        weighted_scores.push(WeightedScore {
+            score: r_rep.research_score,
+            weight: 0.10,
+        });
+        Some(r_rep)
+    } else {
+        None
+    };
+
+    // 5. Foresight & Diligence Evaluation (Weight: 0.10)
+    let foresight_report = {
+        let f_rep = ForesightEngine::evaluate(
+            input.draft_response.as_deref(),
+            input.code_snippet.as_deref(),
+            input.user_requirements.len(),
+            input.planned_tasks.len(),
+        );
+        if f_rep.is_lazy_plan {
+            critical_violations.push(
+                "Lazy Plan Violation: High requirement count but shallow plan breakdown (<=1 task). Decompose plan into concrete steps."
+                    .to_string(),
+            );
+        }
+        for rec in &f_rep.recommendations {
+            recommendations.push(rec.clone());
+        }
+
+        weighted_scores.push(WeightedScore {
+            score: f_rep.foresight_score,
+            weight: 0.10,
+        });
+        Some(f_rep)
+    };
+
+    // 6. Code Metrics Evaluation (Weight: 0.20)
     let code_report = if let Some(ref code) = input.code_snippet {
         let lang = input.language.as_deref().unwrap_or("rust");
         let rep = CodeAnalyzer::analyze(code, lang);
@@ -192,7 +242,7 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
 
         weighted_scores.push(WeightedScore {
             score: rep.maintainability_index,
-            weight: 0.25,
+            weight: 0.20,
         });
         Some(rep)
     } else {
@@ -225,6 +275,8 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
             "dag": dag_report,
             "text": text_report,
             "confidence": confidence_report,
+            "research": research_report,
+            "foresight": foresight_report,
             "code": code_report,
         }),
         critical_violations,

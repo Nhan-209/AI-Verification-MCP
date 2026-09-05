@@ -19,6 +19,14 @@
    - **McCabe Cyclomatic Complexity:** $M \le 10$ per function ($M \le 20$ project limit).
    - **Maintainability Index:** $MI \ge 65$ (Green Zone).
    - **Zero Parsing Errors:** Code must produce 0 syntax error nodes in AST.
+6. **Epistemic Calibration Axiom ($C_{\text{calibrated}} = 1$):**
+   - Never make ungrounded absolute assertions ("guaranteed", "100%", "chắc chắn tuyệt đối") without mathematical proof or empirical test logs.
+   - Differentiate between evasive fluff and scientific caution.
+7. **Empirical Grounding Principle ($E_{\text{ratio}} \ge 0.5$):**
+   - Any factual claim regarding versions, API behaviors, benchmarks, or limits must be grounded in citations (RFCs, official docs, file paths, test logs).
+8. **Proactive Foresight Axiom ($F_{\text{foresight}} \ge 65$):**
+   - Anticipate failure modes: defensive error handling, timeout/fallback, boundary/edge cases, and testing strategies must be explicitly designed.
+   - Avoid lazy planning: decompose complex tasks into verifiable DAG steps.
 
 ---
 
@@ -29,8 +37,15 @@ Whenever the `mcp-plugin-math` MCP server is available:
 1. **Before Executing Tasks:**
    - Call `math_verify_constraints` to ensure user requirements have no internal contradictions and are fully mapped.
    - Call `math_track_dag` to validate the topological ordering of the task breakdown.
+   - Call `math_eval_foresight` to ensure the plan is deep and anticipates edge cases.
 
-2. **Before Submitting Final Output / Code:**
+2. **When Researching or Specifying Facts:**
+   - Call `math_audit_research` to verify that technical claims are backed by official documentation or test benchmarks.
+
+3. **When Modifying Existing Code:**
+   - Call `math_eval_diff` to calculate complexity delta and regression risk before committing changes.
+
+4. **Before Submitting Final Output / Code:**
    - Call `math_audit_cognition`:
      ```json
      {
@@ -43,6 +58,4 @@ Whenever the `mcp-plugin-math` MCP server is available:
      }
      ```
    - If verdict is `FAIL` or has critical violations, **DO NOT SEND TO USER YET**.
-   - Remediate the identified violations first (refactor code, remove scope creep, shorten verbose text), then re-verify until `PASS`.
-
----
+   - Remediate the identified violations first (refactor code, eliminate overconfidence, add citations, add error handling), then re-verify until `PASS`.

@@ -1,7 +1,8 @@
 use crate::mcp::protocol::{CallToolResult, JsonRpcError, JsonRpcRequest, JsonRpcResponse};
 use crate::tools::{
     execute_code_evaluator, execute_confidence_checker, execute_constraint_checker,
-    execute_diff_checker, execute_plan_tracker, execute_text_evaluator, execute_unified_audit,
+    execute_diff_checker, execute_foresight_checker, execute_plan_tracker,
+    execute_research_checker, execute_text_evaluator, execute_unified_audit,
     get_available_tools,
 };
 use serde_json::{json, Value};
@@ -26,7 +27,7 @@ pub fn handle_request(req: JsonRpcRequest) -> Option<JsonRpcResponse> {
                 },
                 "serverInfo": {
                     "name": "mcp-plugin-math",
-                    "version": "0.2.0"
+                    "version": "0.3.0"
                 }
             })),
             error: None,
@@ -57,6 +58,8 @@ pub fn handle_request(req: JsonRpcRequest) -> Option<JsonRpcResponse> {
                 "math_eval_diff" => execute_diff_checker(arguments),
                 "math_eval_text" => execute_text_evaluator(arguments),
                 "math_confidence" => execute_confidence_checker(arguments),
+                "math_audit_research" => execute_research_checker(arguments),
+                "math_eval_foresight" => execute_foresight_checker(arguments),
                 "math_verify_constraints" => execute_constraint_checker(arguments),
                 _ => Err(format!("Unknown tool: '{}'", tool_name)),
             };
