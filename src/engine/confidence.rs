@@ -63,7 +63,7 @@ impl ConfidenceAnalyzer {
             "unclear", "debatable", "in my opinion", "it depends", "hard to say",
         ];
 
-        let mut hedging_count = 0.0;
+        let mut hedging_count: f64 = 0.0;
         for sentence in &sentences {
             let lower_sentence = sentence.to_lowercase();
             if HEDGING_PHRASES.iter().any(|&p| lower_sentence.contains(p)) {
@@ -76,7 +76,7 @@ impl ConfidenceAnalyzer {
 
         let words: Vec<&str> = text.split_whitespace().collect();
         let word_count = words.len() as f64;
-        let mut specific_items = 0.0;
+        let mut specific_items: f64 = 0.0;
 
         let mut in_code_block = false;
         for line in text.lines() {
@@ -188,14 +188,14 @@ impl ConfidenceAnalyzer {
             "let me help",
         ];
 
-        let mut filler_count = 0.0;
+        let mut filler_count: f64 = 0.0;
         let lower_text = text.to_lowercase();
         for &filler in AI_FILLER_PHRASES {
             if lower_text.contains(filler) {
                 filler_count += 1.0;
             }
         }
-        let filler_penalty = (filler_count * 0.1).min(1.0);
+        let filler_penalty = (filler_count * 0.1f64).min(1.0f64);
 
         let mut confidence_score = 0.35 * assertion_density
             + 0.30 * specificity
