@@ -414,9 +414,8 @@ fn invariant_plan_phase_never_authorizes_delivery() {
         "PLAN_APPROVED",
         "Plan phase verdict must be PLAN_APPROVED, not PASS"
     );
-    assert_eq!(
-        res["is_delivery_authorized"].as_bool().unwrap(),
-        false,
+    assert!(
+        !res["is_delivery_authorized"].as_bool().unwrap(),
         "is_delivery_authorized must be false under audit_phase='plan'"
     );
 }
@@ -440,9 +439,8 @@ fn invariant_execution_phase_authorizes_delivery_on_allow() {
 
     assert_eq!(res["decision"].as_str().unwrap(), "ALLOW");
     assert_eq!(res["verdict"].as_str().unwrap(), "PASS");
-    assert_eq!(
+    assert!(
         res["is_delivery_authorized"].as_bool().unwrap(),
-        true,
         "is_delivery_authorized must be true for passing execution phase"
     );
 }
