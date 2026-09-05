@@ -241,12 +241,29 @@ impl ResearchGate {
             }
 
             // Factual claim detection: version strings, benchmarks, release dates
-            let has_version_claim = lower.contains('v') && sentence.chars().any(|c| c.is_ascii_digit());
-            let has_benchmark_claim = lower.contains("ms")
-                || lower.contains("ops/s")
+            let has_version_claim = lower.contains("version")
+                || lower.contains("phiên bản")
+                || sentence.split_whitespace().any(|word| {
+                    let w = word.trim_matches(|c: char| !c.is_alphanumeric());
+                    (w.starts_with('v') || w.starts_with('V'))
+                        && w.len() >= 2
+                        && w[1..].chars().next().map(|c| c.is_ascii_digit()).unwrap_or(false)
+                });
+
+            let has_benchmark_claim = lower.contains("ops/s")
                 || lower.contains("benchmark")
                 || lower.contains("throughput")
-                || lower.contains("latency");
+                || lower.contains("latency")
+                || lower.contains("p99")
+                || lower.contains("p95")
+                || lower.contains("req/s")
+                || sentence.split_whitespace().any(|w| {
+                    let clean = w.trim_matches(|c: char| !c.is_alphanumeric());
+                    clean.ends_with("ms")
+                        && clean.len() >= 3
+                        && clean.trim_end_matches("ms").chars().all(|c| c.is_ascii_digit() || c == '.')
+                });
+
             let has_spec_claim = lower.contains("supports")
                 || lower.contains("compatible with")
                 || lower.contains("hỗ trợ")
