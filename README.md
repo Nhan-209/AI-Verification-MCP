@@ -180,6 +180,12 @@ All tools feature 100% backward-compatible aliases for legacy `math_*` clients.
 
 Pre-compiled standalone binaries for **Linux (x86_64)** and **Windows (x86_64)** are built on every release and commit via [GitHub Actions](https://github.com/Nhan-209/mcp-plugin-math/actions). Both `ai-verification-mcp` and `mcp-plugin-math` binaries are produced identically.
 
+### 🌐 Transport, Protocol Conformance & Trust Boundaries
+
+- **Transport**: Standard Input/Output (`stdio`). The server operates locally as a child process spawned by the client runtime (e.g. Antigravity, Claude Desktop, Cursor).
+- **Protocol Compatibility**: Implements a high-performance, stateless JSON-RPC MCP core compatible with selected **2026-07-28** semantics (dynamic protocol negotiation, `server/discover` tool catalog) while maintaining strict backward compatibility with legacy **2024-11-05** clients.
+- **Process Isolation & Trust Boundary**: As a local stdio server, process isolation and filesystem permissions are enforced by the operating system. If this verifier is deployed over an untrusted network (e.g. remote HTTP/SSE), an independent authentication, authorization, and TLS termination gateway must be placed in front of the server.
+
 ### Configuration in MCP Clients
 
 Add to your `claude_desktop_config.json`, Antigravity, or Gemini CLI configuration:

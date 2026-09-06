@@ -75,8 +75,9 @@ pub const UNTRUSTED_OR_PLACEHOLDER_DOMAINS: &[&str] = &[
 ];
 
 /// Curated registry of verified, widely-implemented IETF RFC standards.
+/// Note: RFC 1234 was removed as it is not a widely-implemented standard specification.
 pub const KNOWN_RFC_REGISTRY: &[u32] = &[
-    768, 791, 792, 793, 826, 854, 862, 959, 1034, 1035, 1122, 1123, 1157, 1191, 1213, 1234, 1305, 1321, 1332, 1350,
+    768, 791, 792, 793, 826, 854, 862, 959, 1034, 1035, 1122, 1123, 1157, 1191, 1213, 1305, 1321, 1332, 1350,
     1541, 1542, 1661, 1918, 1939, 1945, 1997, 2024, 2045, 2046, 2068, 2119, 2131, 2132, 2205, 2246, 2326, 2328, 2401,
     2460, 2616, 2818, 2821, 2822, 3031, 3261, 3315, 3339, 3411, 3412, 3414, 3492, 3550, 3986, 4122, 4251, 4252, 4253,
     4254, 4301, 4346, 4364, 4648, 4861, 4862, 4960, 5246, 5280, 5321, 5322, 5869, 5952, 6066, 6120, 6121, 6265, 6347,
@@ -84,12 +85,18 @@ pub const KNOWN_RFC_REGISTRY: &[u32] = &[
     8446, 8484, 8999, 9000, 9001, 9110, 9111, 9112, 9113, 9114, 9204, 9218, 9293, 9440,
 ];
 
+/// Registry release and provenance metadata.
+pub const REGISTRY_VERSION: &str = "2026.1";
+pub const REGISTRY_SOURCE: &str = "IETF Official Standards Track";
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SentenceEvidence {
     pub max_provenance: ProvenanceLevel,
     pub detected_urls: Vec<String>,
     pub detected_rfcs: Vec<u32>,
     pub detected_files: Vec<String>,
+    #[serde(default)]
+    pub detected_standards: Vec<String>,
     pub has_authoritative_domain: bool,
     pub has_verified_source: bool,
     pub has_bare_code_block: bool,
@@ -233,7 +240,16 @@ impl EvidenceClassifier {
         }
 
         // Standards scanning (IEEE 754, ISO/IEC 27001)
-        if lower.contains("ieee 754") || lower.contains("iso/iec 27001") || lower.contains("iso 27001") {
+        let mut detected_standards = Vec::new();
+        if lower.contains("ieee 754") {
+            detected_standards.push("IEEE 754".to_string());
+            has_verified_src = true;
+            if max_prov < ProvenanceLevel::SourceVerified {
+                max_prov = ProvenanceLevel::SourceVerified;
+            }
+        }
+        if lower.contains("iso/iec 27001") || lower.contains("iso 27001") {
+            detected_standards.push("ISO/IEC 27001".to_string());
             has_verified_src = true;
             if max_prov < ProvenanceLevel::SourceVerified {
                 max_prov = ProvenanceLevel::SourceVerified;
@@ -245,6 +261,7 @@ impl EvidenceClassifier {
             detected_urls,
             detected_rfcs,
             detected_files,
+            detected_standards,
             has_authoritative_domain: has_authoritative,
             has_verified_source: has_verified_src,
             has_bare_code_block: has_code_block,

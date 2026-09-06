@@ -30,7 +30,7 @@ pub fn get_available_tools() -> Vec<Tool> {
     vec![
         Tool {
             name: "verify_agent".to_string(),
-            description: "Unified AI Agent Governance & Behavioral Verification Gate (formerly math_audit_cognition). Evaluates decisions as ALLOW, WARN, or BLOCK across 6 verification pillars: constraints, plan DAG, text density, epistemic calibration, empirical research, and proactive foresight.".to_string(),
+            description: "Unified AI Agent Governance & Behavioral Verification Gate (formerly math_audit_cognition). Evaluates decisions as ALLOW, WARN, BLOCK, or INSUFFICIENT_EVIDENCE across 6 verification pillars: constraints, plan DAG, text density, epistemic calibration, empirical research, and proactive foresight.".to_string(),
             input_schema: json!({
                 "type": "object",
                 "properties": {
@@ -52,7 +52,10 @@ pub fn get_available_tools() -> Vec<Tool> {
                             "properties": {
                                 "id": { "type": "string" },
                                 "name": { "type": "string" },
-                                "dependencies": { "type": "array", "items": { "type": "string" } }
+                                "dependencies": { "type": "array", "items": { "type": "string" } },
+                                "capability": { "type": "string", "description": "Required capability (e.g. test.exec, filesystem.write, code.build)" },
+                                "target": { "type": "string", "description": "Target file or resource affected" },
+                                "side_effect": { "type": "boolean", "description": "Whether task produces external mutation" }
                             },
                             "required": ["id", "name"]
                         },
@@ -80,17 +83,29 @@ pub fn get_available_tools() -> Vec<Tool> {
                         "enum": ["plan", "execution"],
                         "description": "Audit phase: 'plan' (validates plan structure, delivery not authorized) or 'execution' (validates execution and receipts)"
                     },
+                    "audit_id": {
+                        "type": "string",
+                        "description": "Session or audit identifier to bind execution receipts and prevent cross-session replay"
+                    },
                     "execution_receipts": {
                         "type": "array",
                         "items": {
                             "type": "object",
                             "properties": {
+                                "receipt_id": { "type": "string" },
                                 "action_id": { "type": "string" },
                                 "tool_name": { "type": "string" },
-                                "arguments_hash": { "type": "string" },
-                                "result_hash": { "type": "string" },
+                                "arguments_hash": { "type": "string", "description": "64-character hex SHA-256 hash" },
+                                "result_hash": { "type": "string", "description": "64-character hex SHA-256 hash" },
                                 "exit_code": { "type": "integer" },
-                                "workspace_revision": { "type": "string" }
+                                "audit_id": { "type": "string" },
+                                "workspace_id": { "type": "string" },
+                                "workspace_revision": { "type": "string" },
+                                "nonce": { "type": "string" },
+                                "issuer": { "type": "string" },
+                                "signature": { "type": "string" },
+                                "started_at": { "type": "string", "description": "RFC 3339 timestamp" },
+                                "finished_at": { "type": "string", "description": "RFC 3339 timestamp" }
                             },
                             "required": ["action_id", "tool_name"]
                         },
@@ -101,9 +116,15 @@ pub fn get_available_tools() -> Vec<Tool> {
                         "items": {
                             "type": "object",
                             "properties": {
+                                "receipt_id": { "type": "string" },
                                 "kind": { "type": "string" },
                                 "source_id": { "type": "string" },
-                                "sha256": { "type": "string" }
+                                "sha256": { "type": "string", "description": "64-character hex SHA-256 hash" },
+                                "timestamp": { "type": "string", "description": "RFC 3339 timestamp" },
+                                "provenance": { "type": "string" },
+                                "claim_id": { "type": "string" },
+                                "claim_binding": { "type": "string" },
+                                "workspace_id": { "type": "string" }
                             },
                             "required": ["kind", "source_id"]
                         },

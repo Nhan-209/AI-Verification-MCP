@@ -449,7 +449,7 @@ fn invariant_execution_phase_authorizes_delivery_on_allow() {
                 "exit_code": 0
             }
         ],
-        "draft_response": "According to docs.rs and RFC 1234, the helper is implemented in helper.rs. See: https://docs.rs/example",
+        "draft_response": "According to docs.rs and RFC 2119, the helper is implemented in helper.rs. See: https://docs.rs/example",
         "code_snippet": "fn helper() -> Result<bool, String> { Ok(true) }",
         "language": "rust"
     }))
@@ -664,6 +664,7 @@ fn test_evidence_receipt_enforcement() {
         "executed_steps": ["t1"],
         "execution_receipts": [
             {
+                "receipt_id": "rcpt-t1-bench",
                 "action_id": "t1",
                 "tool_name": "benchmark_tool",
                 "arguments_hash": "a1b2c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef0",

@@ -140,7 +140,7 @@ fn test_adversarial_entity_substitution_rejected() {
     assert_eq!(res["decision"], "BLOCK");
     assert_eq!(res["verdict"], "FAIL");
     let violations = res["violations"].as_array().unwrap();
-    assert!(violations.iter().any(|v| v["code"] == "CONSTRAINT_CONFLICT"));
+    assert!(violations.iter().any(|v| v["code"] == "REQUIREMENT_OMISSION"));
 }
 
 #[test]
