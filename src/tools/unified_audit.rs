@@ -1247,8 +1247,11 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
         info: info_count,
     };
 
-    // Policy score is determined strictly by deterministic invariant compliance
-    let policy_score = if critical_count > 0 || !has_any_input || !mandatory_contract_met {
+    let policy_score = if critical_count > 0
+        || !has_any_input
+        || !mandatory_contract_met
+        || (input.audit_phase.as_deref() == Some("execution") && input.executed_steps.is_empty())
+    {
         0.0
     } else if warning_count > 0 {
         (diagnostic_score * 0.8).min(74.0)
@@ -1258,12 +1261,16 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
 
     let composite_score = (policy_score * 0.7) + (diagnostic_score * 0.3);
 
-    let (decision, verdict) = if critical_count > 0 {
+    let (decision, verdict) = if input.audit_phase.as_deref() == Some("execution")
+        && input.executed_steps.is_empty()
+        && !is_deep
+    {
+        ("INSUFFICIENT_EVIDENCE".to_string(), "UNVERIFIED".to_string())
+    } else if critical_count > 0 {
         ("BLOCK".to_string(), "FAIL".to_string())
     } else if !has_any_input
         || weighted_scores.is_empty()
         || !mandatory_contract_met
-        || (input.audit_phase.as_deref() == Some("execution") && input.executed_steps.is_empty())
     {
         ("INSUFFICIENT_EVIDENCE".to_string(), "UNVERIFIED".to_string())
     } else if policy_score < 50.0 {
