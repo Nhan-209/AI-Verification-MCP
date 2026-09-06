@@ -1,8 +1,11 @@
-use crate::engine::resource_limits::{MAX_EXECUTED_STEPS, MAX_TASKS};
+use crate::engine::resource_limits::{
+    MAX_EXECUTED_STEPS, MAX_TASKS, MAX_TASK_ID_LEN, MAX_TASK_NAME_LEN,
+};
 use crate::engine::PlanDag;
 use crate::tools::unified_audit::PlanTaskInput;
 use serde::Deserialize;
 use serde_json::{json, Value};
+use std::collections::HashMap;
 
 #[derive(Debug, Deserialize)]
 pub struct PlanTrackerInput {
@@ -30,9 +33,45 @@ pub fn execute_plan_tracker(args: Value) -> Result<Value, String> {
         ));
     }
 
+    // Pre-validate task fields (consistent with unified audit contract)
+    let mut id_counts: HashMap<&str, usize> = HashMap::new();
+    for t in &input.tasks {
+        let id_trimmed = t.id.trim();
+        let name_trimmed = t.name.trim();
+
+        if id_trimmed.is_empty() {
+            return Err("Schema Violation: A task has an empty or whitespace-only ID.".to_string());
+        }
+        if id_trimmed.len() > MAX_TASK_ID_LEN {
+            return Err(format!(
+                "Schema Violation: Task ID '{}' exceeds max length {} chars.",
+                id_trimmed, MAX_TASK_ID_LEN
+            ));
+        }
+        if name_trimmed.is_empty() {
+            return Err("Schema Violation: A task has an empty or whitespace-only name.".to_string());
+        }
+        if name_trimmed.len() > MAX_TASK_NAME_LEN {
+            return Err(format!(
+                "Schema Violation: Task name '{}' exceeds max length {} chars.",
+                name_trimmed, MAX_TASK_NAME_LEN
+            ));
+        }
+        *id_counts.entry(id_trimmed).or_insert(0) += 1;
+    }
+
+    for (id, count) in &id_counts {
+        if *count > 1 {
+            return Err(format!(
+                "Schema Violation: Duplicate task ID '{}' found {} times in plan.",
+                id, count
+            ));
+        }
+    }
+
     let mut dag = PlanDag::new();
     for t in input.tasks {
-        dag.add_task(t.id, t.name, t.dependencies);
+        dag.add_task(t.id.trim(), t.name.trim(), t.dependencies);
     }
 
     let validation = dag.validate_graph();
@@ -47,6 +86,8 @@ pub fn execute_plan_tracker(args: Value) -> Result<Value, String> {
     let metrics = dag.evaluate_metrics();
 
     Ok(json!({
+        "result_type": "DIAGNOSTIC",
+        "authoritative": false,
         "graph_valid": validation.is_ok(),
         "graph_validation_error": validation.err(),
         "step_errors": step_errors,

@@ -1,6 +1,7 @@
 use crate::engine::evidence_classifier::{
     EvidenceClassifier, ProvenanceLevel, AUTHORITATIVE_DOMAINS, KNOWN_RFC_REGISTRY, UNTRUSTED_OR_PLACEHOLDER_DOMAINS,
 };
+use crate::engine::receipts::EvidenceReceipt;
 use crate::engine::text_utils::{smart_split_sentences, HEDGING_PHRASES};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
@@ -245,6 +246,11 @@ impl ResearchGate {
 
     /// Audits response text to verify that technical claims are backed by research and citations.
     pub fn audit(text: &str) -> ResearchReport {
+        Self::audit_with_evidence(text, None)
+    }
+
+    /// Audits response text with optional EvidenceReceipt verification.
+    pub fn audit_with_evidence(text: &str, evidence_receipts: Option<&[EvidenceReceipt]>) -> ResearchReport {
         let trimmed = text.trim();
         if trimmed.is_empty() {
             return ResearchReport {
@@ -283,6 +289,47 @@ impl ResearchGate {
             total_unverified += unv_count;
             for s in sources {
                 detected_sources.push(s);
+            }
+
+            // Check if an explicit EvidenceReceipt covers this sentence or claim
+            let mut receipt_supported = false;
+            if let Some(receipts) = evidence_receipts {
+                for r in receipts {
+                    if !r.is_valid_evidence() {
+                        continue;
+                    }
+                    let binds_claim = r.claim_binding.as_ref()
+                        .map(|b| !b.trim().is_empty() && (lower.contains(&b.to_lowercase()) || b.to_lowercase().contains(&lower)))
+                        .unwrap_or(false);
+                    let mentions_source = lower.contains(&r.source_id.to_lowercase());
+
+                    if binds_claim || mentions_source {
+                        let is_valid_artifact = match r.kind.to_uppercase().as_str() {
+                            "FILE" => Path::new(&r.source_id).exists(),
+                            "RFC" => {
+                                let num_str: String = r.source_id.chars().filter(|c| c.is_ascii_digit()).collect();
+                                if let Ok(num) = num_str.parse::<u32>() {
+                                    KNOWN_RFC_REGISTRY.binary_search(&num).is_ok()
+                                } else {
+                                    false
+                                }
+                            }
+                            "DOCS_URL" => {
+                                Self::extract_hostname(&r.source_id.to_lowercase())
+                                    .map(|h| AUTHORITATIVE_DOMAINS.iter().any(|&d| h == d || h.ends_with(&format!(".{}", d))))
+                                    .unwrap_or(false)
+                            }
+                            "TEST_RUN" | "AST_REPORT" => r.sha256.is_some(),
+                            _ => true,
+                        };
+
+                        if is_valid_artifact {
+                            receipt_supported = true;
+                            detected_sources.push(format!("Verified EvidenceReceipt [{}] for claim: '{}'", r.kind, r.source_id));
+                            break;
+                        }
+                    }
+                }
             }
 
             // Factual claim detection: version strings, benchmarks, release dates
@@ -326,15 +373,18 @@ impl ResearchGate {
                     "API_COMPATIBILITY"
                 };
 
-                let evidence_status = if unv_count > 0 {
-                    EvidenceStatus::EvidencePresent
-                } else if v_count > 0 {
+                let evidence_status = if receipt_supported || v_count > 0 {
                     EvidenceStatus::EvidenceVerified
+                } else if unv_count > 0 {
+                    EvidenceStatus::EvidencePresent
                 } else {
                     EvidenceStatus::Unsupported
                 };
 
                 let is_verified = evidence_status == EvidenceStatus::EvidenceVerified;
+                if receipt_supported && v_count == 0 {
+                    total_verified += 1;
+                }
 
                 let remediation = match evidence_status {
                     EvidenceStatus::Unsupported => match claim_type {
@@ -342,7 +392,7 @@ impl ResearchGate {
                         "VERSION_SPECIFICATION" => "Provide official release documentation URL or repository link validating version feature support.".to_string(),
                         _ => "Provide official API reference or specification documentation confirming compatibility.".to_string(),
                     },
-                    EvidenceStatus::EvidencePresent => "Citation detected but unverified against authoritative registry/RFC database. Ground claim in official docs (docs.rs, ietf.org, github.com).".to_string(),
+                    EvidenceStatus::EvidencePresent => "Citation detected but unverified against authoritative registry/RFC database. Ground claim in official docs (docs.rs, ietf.org, github.com) or provide verified EvidenceReceipt.".to_string(),
                     EvidenceStatus::EvidenceVerified => String::new(),
                 };
 
