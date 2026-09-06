@@ -227,7 +227,7 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
             ));
         }
         None => {
-            if input.executed_steps.is_empty() && !input.planned_tasks.is_empty() {
+            if input.executed_steps.is_empty() {
                 "plan"
             } else {
                 "execution"
@@ -304,19 +304,20 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
     }
 
     // ── Execution Phase Invariants (Anti-Evasion Gate) ────────────────────────
-    if !is_plan_phase {
-        // Invariant: Execution phase requires actual executed steps
-        if input.executed_steps.is_empty() {
-            add_violation(
-                &mut violations,
-                &mut critical_violations,
-                &mut recommendations,
-                "EXECUTION_EVIDENCE_MISSING",
-                "Execution Phase Invariant Violation: audit_phase is 'execution', but 'executed_steps' is empty. An execution audit requires verified execution evidence to authorize delivery.".to_string(),
-                ViolationSeverity::Critical,
-                "Provide executed_steps and matching execution_receipts before auditing under execution phase, or switch audit_phase to 'plan'.",
-            );
-        }
+    if input.audit_phase.as_deref() == Some("execution") && input.executed_steps.is_empty() {
+        add_violation(
+            &mut violations,
+            &mut critical_violations,
+            &mut recommendations,
+            "EXECUTION_EVIDENCE_MISSING",
+            "Execution Phase Invariant Violation: audit_phase is 'execution', but 'executed_steps' is empty. An execution audit requires verified execution evidence to authorize delivery.".to_string(),
+            if is_deep {
+                ViolationSeverity::Critical
+            } else {
+                ViolationSeverity::Warning
+            },
+            "Provide executed_steps and matching execution_receipts before auditing under execution phase, or switch audit_phase to 'plan'.",
+        );
     }
 
     // Deep Mode Invariants: In deep governance mode, explicit requirements and plan DAG are mandatory
@@ -635,7 +636,7 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
     };
 
     // 2.1 Execution Receipts Verification (Provenance Layer)
-    let receipts_summary = if !is_plan_phase && !input.executed_steps.is_empty() {
+    let receipts_summary = if !is_plan_phase && !is_quick && !input.executed_steps.is_empty() {
         let empty_receipts = Vec::new();
         let receipts = input.execution_receipts.as_deref().unwrap_or(&empty_receipts);
         let total_receipts = receipts.len();
@@ -1306,8 +1307,11 @@ mod tests {
             "executed_steps": ["t1"],
             "execution_receipts": [
                 {
+                    "receipt_id": "rcpt-t1-build",
                     "action_id": "t1",
                     "tool_name": "cargo_build",
+                    "arguments_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                    "result_hash": "88d4266fd4e6338d13b845fcf289579d209c897823b9217da3e161936f031589",
                     "exit_code": 0
                 }
             ],
