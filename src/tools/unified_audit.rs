@@ -971,7 +971,6 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
             0.0
         }
     };
-    let composite_score = policy_score;
 
     let critical_count = violations
         .iter()
