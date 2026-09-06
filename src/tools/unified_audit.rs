@@ -645,9 +645,8 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
         let mut unverifiable_count = 0;
         let mut unattested_steps = Vec::new();
 
-        let require_receipt_violations = input.execution_receipts.is_some()
-            || input.audit_phase.as_deref() == Some("execution")
-            || is_deep;
+        let require_receipt_violations =
+            input.execution_receipts.is_some() || input.audit_phase.as_deref() == Some("execution") || is_deep;
 
         for step in &input.executed_steps {
             let matching: Vec<&ExecutionReceipt> = receipts.iter().filter(|r| r.action_id == *step).collect();
