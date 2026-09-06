@@ -431,6 +431,24 @@ fn invariant_execution_phase_authorizes_delivery_on_allow() {
             {"id": "t2", "name": "add tests", "dependencies": ["t1"]}
         ],
         "executed_steps": ["t1", "t2"],
+        "execution_receipts": [
+            {
+                "receipt_id": "rcpt-t1-valid",
+                "action_id": "t1",
+                "tool_name": "cargo_test",
+                "arguments_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                "result_hash": "88d4266fd4e6338d13b845fcf289579d209c897823b9217da3e161936f031589",
+                "exit_code": 0
+            },
+            {
+                "receipt_id": "rcpt-t2-valid",
+                "action_id": "t2",
+                "tool_name": "cargo_test",
+                "arguments_hash": "a1b2c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef0",
+                "result_hash": "b2c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef01a",
+                "exit_code": 0
+            }
+        ],
         "draft_response": "According to docs.rs and RFC 1234, the helper is implemented in helper.rs. See: https://docs.rs/example",
         "code_snippet": "fn helper() -> Result<bool, String> { Ok(true) }",
         "language": "rust"
