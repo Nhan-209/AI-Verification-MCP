@@ -1083,9 +1083,7 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
     };
 
     // Policy score is determined strictly by deterministic invariant compliance
-    let policy_score = if critical_count > 0 {
-        0.0
-    } else if !has_any_input || !mandatory_contract_met {
+    let policy_score = if critical_count > 0 || !has_any_input || !mandatory_contract_met {
         0.0
     } else if warning_count > 0 {
         (diagnostic_score * 0.8).min(74.0)
