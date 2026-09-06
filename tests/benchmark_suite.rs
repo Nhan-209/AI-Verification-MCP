@@ -240,7 +240,9 @@ fn test_governance_benchmark_quick_mode_latency_under_1ms() {
     let start = Instant::now();
     for _ in 0..iterations {
         let res = execute_unified_audit(quick_payload.clone()).expect("Audit iteration failed");
-        assert_eq!(res["decision"], "ALLOW");
+        assert_eq!(res["decision"], "CHECKPOINT_PASS");
+        assert_eq!(res["verdict"], "QUICK_PASS");
+        assert_eq!(res["is_delivery_authorized"], false);
     }
     let elapsed = start.elapsed();
     let avg_latency = elapsed / iterations;
