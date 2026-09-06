@@ -334,3 +334,31 @@ fn test_bare_acronym_prose_marker_rejected() {
     assert!(report.has_research_deficit);
     assert_eq!(report.verified_citations_count, 0);
 }
+
+#[test]
+fn test_adversarial_bare_code_block_cannot_launder_overconfidence() {
+    let text = "This logic is guaranteed 100% bug-free and will never fail: ```rust fn test() {} ```";
+    let conf = ConfidenceAnalyzer::analyze(text);
+    assert_eq!(conf.verdict, "OVERCONFIDENT");
+    assert!(!conf.unverified_claims.is_empty());
+}
+
+#[test]
+fn test_adversarial_untrusted_domain_cannot_launder_overconfidence() {
+    let text = "Performance is guaranteed 100% bug-free: https://attacker.example/proof";
+    let conf = ConfidenceAnalyzer::analyze(text);
+    assert_eq!(conf.verdict, "OVERCONFIDENT");
+    assert!(!conf.unverified_claims.is_empty());
+}
+
+#[test]
+fn test_adversarial_diff_lcs_dos_resistance() {
+    // Generate two massive distinct files whose LCS table would normally exceed MAX_LCS_CELLS
+    let before: String = (0..2000).map(|i| format!("fn before_unique_fn_{}() {{}}\n", i)).collect();
+    let after: String = (0..2000).map(|i| format!("fn after_unique_fn_{}() {{}}\n", i)).collect();
+
+    let diff_report = ai_verification_mcp::engine::DiffAnalyzer::analyze(&before, &after, "rust");
+    assert_eq!(diff_report.lines_before, 2000);
+    assert_eq!(diff_report.lines_after, 2000);
+    assert!(diff_report.change_ratio > 0.9);
+}

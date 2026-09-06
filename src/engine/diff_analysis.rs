@@ -39,7 +39,7 @@ pub struct DiffAnalyzer;
 
 impl DiffAnalyzer {
     /// Analyzes the difference between `before` and `after` code strings, computing metrics and regression risk.
-    pub fn analyze(before: &str, after: &str, _language: &str) -> DiffReport {
+    pub fn analyze(before: &str, after: &str, language: &str) -> DiffReport {
         let lines_before: Vec<&str> = before.lines().collect();
         let lines_after: Vec<&str> = after.lines().collect();
         let m = lines_before.len();
@@ -53,8 +53,8 @@ impl DiffAnalyzer {
 
         let change_ratio = (lines_added + lines_removed) as f64 / (m.max(1) as f64);
 
-        let comp_before = Self::compute_complexity(before);
-        let comp_after = Self::compute_complexity(after);
+        let comp_before = Self::compute_complexity(before, language);
+        let comp_after = Self::compute_complexity(after, language);
 
         let delta = ComplexityDelta {
             cyclomatic: comp_after.cyclomatic as i64 - comp_before.cyclomatic as i64,
@@ -124,7 +124,49 @@ impl DiffAnalyzer {
             return 0;
         }
 
-        let (short, long) = if a.len() <= b.len() { (a, b) } else { (b, a) };
+        // 1. Fast path: strip common prefix
+        let mut start = 0;
+        while start < a.len() && start < b.len() && a[start].trim() == b[start].trim() {
+            start += 1;
+        }
+        let common_prefix = start;
+
+        // 2. Fast path: strip common suffix
+        let mut a_end = a.len();
+        let mut b_end = b.len();
+        while a_end > start && b_end > start && a[a_end - 1].trim() == b[b_end - 1].trim() {
+            a_end -= 1;
+            b_end -= 1;
+        }
+        let common_suffix = a.len() - a_end;
+
+        let a_mid = &a[start..a_end];
+        let b_mid = &b[start..b_end];
+
+        if a_mid.is_empty() || b_mid.is_empty() {
+            return common_prefix + common_suffix;
+        }
+
+        // 3. DoS Protection: Cap quadratic DP table
+        if a_mid.len() * b_mid.len() > crate::engine::resource_limits::MAX_LCS_CELLS {
+            // Greedy bounded matching for massive diffs to prevent CPU hang
+            let mut matched = 0;
+            let mut j = 0;
+            for line_a in a_mid {
+                let trimmed_a = line_a.trim();
+                while j < b_mid.len() {
+                    if trimmed_a == b_mid[j].trim() {
+                        matched += 1;
+                        j += 1;
+                        break;
+                    }
+                    j += 1;
+                }
+            }
+            return common_prefix + common_suffix + matched;
+        }
+
+        let (short, long) = if a_mid.len() <= b_mid.len() { (a_mid, b_mid) } else { (b_mid, a_mid) };
         let n = short.len();
         let mut prev = vec![0usize; n + 1];
         let mut curr = vec![0usize; n + 1];
@@ -141,29 +183,19 @@ impl DiffAnalyzer {
             std::mem::swap(&mut prev, &mut curr);
             curr.fill(0);
         }
-        prev[n]
+        common_prefix + common_suffix + prev[n]
     }
 
-    fn compute_complexity(code: &str) -> ComplexitySnapshot {
-        let loc = code.lines().count();
-        let mut cyclomatic = 1;
-
-        let tokens = ["if ", "for ", "while ", "match ", "case ", "catch ", "&&", "||", "?"];
-        for line in code.lines() {
-            let t_line = line.trim();
-            for &token in &tokens {
-                if t_line.contains(token) {
-                    cyclomatic += 1;
-                }
-            }
+    fn compute_complexity(code: &str, language: &str) -> ComplexitySnapshot {
+        if code.trim().is_empty() {
+            return ComplexitySnapshot::default();
         }
 
-        let mi = (100.0 - (cyclomatic as f64 * 3.0) - (loc as f64 / 10.0)).max(0.0);
-
+        let m = crate::engine::CodeAnalyzer::analyze(code, language);
         ComplexitySnapshot {
-            cyclomatic,
-            maintainability_index: mi,
-            loc,
+            cyclomatic: m.cyclomatic_complexity,
+            maintainability_index: m.maintainability_index,
+            loc: m.lines_of_code,
         }
     }
 
@@ -255,5 +287,16 @@ mod tests {
         let report = DiffAnalyzer::analyze(&before, &after, "rust");
         assert_eq!(report.lines_before, 1000);
         assert_eq!(report.lines_after, 1000);
+    }
+
+    #[test]
+    fn test_diff_prefix_suffix_trimming() {
+        let prefix = "common_prefix_line();\n".repeat(500);
+        let suffix = "common_suffix_line();\n".repeat(500);
+        let before = format!("{}let old_val = 1;\n{}", prefix, suffix);
+        let after = format!("{}let new_val = 2;\n{}", prefix, suffix);
+        let report = DiffAnalyzer::analyze(&before, &after, "rust");
+        assert_eq!(report.lines_added, 1);
+        assert_eq!(report.lines_removed, 1);
     }
 }

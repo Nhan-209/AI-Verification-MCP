@@ -1,7 +1,7 @@
 use petgraph::algo::toposort;
 use petgraph::graph::{DiGraph, NodeIndex};
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashSet};
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TaskStatus {
@@ -34,7 +34,7 @@ pub struct DagMetrics {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlanDag {
-    pub tasks: HashMap<String, PlanTask>,
+    pub tasks: BTreeMap<String, PlanTask>,
     pub execution_log: Vec<String>,
 }
 
@@ -47,7 +47,7 @@ impl Default for PlanDag {
 impl PlanDag {
     pub fn new() -> Self {
         Self {
-            tasks: HashMap::new(),
+            tasks: BTreeMap::new(),
             execution_log: Vec::new(),
         }
     }
@@ -68,7 +68,7 @@ impl PlanDag {
     /// Verifies if the planned DAG has cycles or invalid references.
     pub fn validate_graph(&self) -> Result<Vec<String>, String> {
         let mut graph = DiGraph::<String, ()>::new();
-        let mut node_indices = HashMap::new();
+        let mut node_indices = BTreeMap::new();
 
         for id in self.tasks.keys() {
             let idx = graph.add_node(id.clone());
@@ -102,12 +102,11 @@ impl PlanDag {
         }
     }
 
-    /// Checks if an unplanned task is a benign exploratory or verification step.
-    pub fn is_exploratory_action(action_id: &str) -> bool {
+    /// Checks if an action is a mutating or state-changing operation.
+    /// Mutating actions alter code, file systems, databases, network state, or external environments.
+    pub fn is_mutation_action(action_id: &str) -> bool {
         let lower = action_id.to_lowercase();
-
-        // Destructive or mutation verbs/prefixes immediately disqualify an action from being exploratory
-        const DISQUALIFYING_TERMS: &[&str] = &[
+        const MUTATION_TERMS: &[&str] = &[
             "implement",
             "create",
             "build",
@@ -116,25 +115,58 @@ impl PlanDag {
             "delete",
             "remove",
             "drop",
+            "truncate",
+            "destroy",
             "exfiltrate",
             "write",
+            "save",
+            "overwrite",
+            "patch",
+            "update",
+            "alter",
             "steal",
             "leak",
             "curl",
             "wget",
             "exec",
+            "spawn",
+            "run",
+            "send",
+            "upload",
+            "post",
+            "put",
+            "forward",
+            "publish",
+            "push",
+            "transmit",
+            "transfer",
+            "export",
+            "dump",
+            "deploy",
+            "migrate",
             "xóa",
             "tạo",
             "sửa",
             "thêm",
             "chạy",
+            "gửi",
+            "tải",
+            "chuyển",
+            "xuất",
         ];
 
         let tokens: Vec<&str> = lower.split(['_', '-', ' ', '.', ':']).collect();
-        if tokens.iter().any(|&t| DISQUALIFYING_TERMS.contains(&t)) {
+        tokens.iter().any(|&t| MUTATION_TERMS.contains(&t))
+    }
+
+    /// Checks if an unplanned task is a benign exploratory or verification step.
+    /// If an action contains ANY mutation term, it is strictly disqualified from being exploratory.
+    pub fn is_exploratory_action(action_id: &str) -> bool {
+        if Self::is_mutation_action(action_id) {
             return false;
         }
 
+        let lower = action_id.to_lowercase();
         const EXPLORATORY_KEYWORDS: &[&str] = &[
             "read",
             "view",
@@ -157,6 +189,7 @@ impl PlanDag {
             "tra cứu",
         ];
 
+        let tokens: Vec<&str> = lower.split(['_', '-', ' ', '.', ':']).collect();
         tokens.iter().any(|&t| EXPLORATORY_KEYWORDS.contains(&t))
     }
 
@@ -261,6 +294,11 @@ impl PlanDag {
         let scope_creep_count = unapproved_tasks.len();
         let is_valid = scope_creep_count == 0 && dependency_violations.is_empty();
 
+        // Ensure deterministic ordering for serialization and audits
+        unapproved_tasks.sort();
+        justified_explorations.sort();
+        dependency_violations.sort();
+
         DagMetrics {
             total_planned,
             completed_planned,
@@ -353,5 +391,44 @@ mod tests {
         );
         assert_eq!(metrics.justified_explorations.len(), 3);
         assert!(metrics.is_valid);
+    }
+
+    #[test]
+    fn test_composite_exploratory_bypass_prevented() {
+        // Adversarial tasks masquerading as test/verify/audit while performing mutations
+        assert!(!PlanDag::is_exploratory_action("send_credentials_to_test"));
+        assert!(!PlanDag::is_exploratory_action("upload_source_to_verify"));
+        assert!(!PlanDag::is_exploratory_action("post_token_for_audit"));
+        assert!(!PlanDag::is_exploratory_action("delete_database_test"));
+        assert!(!PlanDag::is_exploratory_action("write_payload_check"));
+
+        assert!(PlanDag::is_mutation_action("send_credentials_to_test"));
+        assert!(PlanDag::is_mutation_action("upload_source_to_verify"));
+        assert!(PlanDag::is_mutation_action("delete_database_test"));
+
+        // Genuine exploratory actions
+        assert!(PlanDag::is_exploratory_action("read_readme"));
+        assert!(PlanDag::is_exploratory_action("grep_pattern"));
+        assert!(PlanDag::is_exploratory_action("run_test_suite"));
+        assert!(!PlanDag::is_mutation_action("run_test_suite"));
+    }
+
+    #[test]
+    fn test_deterministic_task_ordering() {
+        let mut dag1 = PlanDag::new();
+        dag1.add_task("z_task", "Z", vec![]);
+        dag1.add_task("a_task", "A", vec![]);
+        dag1.add_task("m_task", "M", vec![]);
+
+        let json1 = serde_json::to_string(&dag1).unwrap();
+
+        let mut dag2 = PlanDag::new();
+        dag2.add_task("m_task", "M", vec![]);
+        dag2.add_task("z_task", "Z", vec![]);
+        dag2.add_task("a_task", "A", vec![]);
+
+        let json2 = serde_json::to_string(&dag2).unwrap();
+
+        assert_eq!(json1, json2, "PlanDag serialization must be byte-for-byte deterministic regardless of insertion order");
     }
 }

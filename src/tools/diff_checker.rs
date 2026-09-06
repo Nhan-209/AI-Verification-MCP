@@ -1,4 +1,5 @@
 use crate::engine::diff_analysis::DiffAnalyzer;
+use crate::engine::resource_limits::{validate_text_bound, MAX_DIFF_BYTES};
 use serde::Deserialize;
 use serde_json::{json, Value};
 
@@ -19,6 +20,10 @@ fn default_language() -> String {
 pub fn execute_diff_checker(args: Value) -> Result<Value, String> {
     let input: DiffCheckerInput =
         serde_json::from_value(args).map_err(|e| format!("Invalid arguments for math_eval_diff: {}", e))?;
+
+    validate_text_bound(&input.before_code, "before_code", MAX_DIFF_BYTES)?;
+    validate_text_bound(&input.after_code, "after_code", MAX_DIFF_BYTES)?;
+
     let report = DiffAnalyzer::analyze(&input.before_code, &input.after_code, &input.language);
     Ok(json!(report))
 }

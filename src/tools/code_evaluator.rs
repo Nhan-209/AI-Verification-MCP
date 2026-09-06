@@ -1,4 +1,5 @@
 use crate::engine::CodeAnalyzer;
+use crate::engine::resource_limits::{validate_text_bound, MAX_CODE_BYTES};
 use serde::Deserialize;
 use serde_json::{json, Value};
 
@@ -16,6 +17,8 @@ fn default_language() -> String {
 pub fn execute_code_evaluator(args: Value) -> Result<Value, String> {
     let input: CodeEvaluatorInput =
         serde_json::from_value(args).map_err(|e| format!("Invalid arguments for math_eval_code: {}", e))?;
+
+    validate_text_bound(&input.code, "code", MAX_CODE_BYTES)?;
 
     let metrics = CodeAnalyzer::analyze(&input.code, &input.language);
     Ok(json!(metrics))

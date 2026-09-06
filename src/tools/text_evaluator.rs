@@ -1,3 +1,4 @@
+use crate::engine::resource_limits::{validate_text_bound, MAX_TEXT_BYTES};
 use crate::engine::TextEvaluator;
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -10,6 +11,8 @@ pub struct TextEvaluatorInput {
 pub fn execute_text_evaluator(args: Value) -> Result<Value, String> {
     let input: TextEvaluatorInput =
         serde_json::from_value(args).map_err(|e| format!("Invalid arguments for math_eval_text: {}", e))?;
+
+    validate_text_bound(&input.text, "text", MAX_TEXT_BYTES)?;
 
     let metrics = TextEvaluator::evaluate(&input.text);
     Ok(json!(metrics))

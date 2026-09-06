@@ -1,5 +1,8 @@
 use crate::engine::{
-    CodeAnalyzer, ConfidenceAnalyzer, ConstraintEngine, ForesightEngine, PlanDag, ResearchGate, TextEvaluator,
+    CodeAnalyzer, ConfidenceAnalyzer, ConstraintEngine, EvidenceClassifier, ForesightEngine, PlanDag,
+    ResearchGate, TextEvaluator,
+    receipts::{EvidenceReceipt, ExecutionReceipt, ReceiptsVerificationSummary},
+    resource_limits::*,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -33,6 +36,15 @@ pub struct UnifiedAuditInput {
     /// if executed_steps is empty → "plan", otherwise → "execution".
     #[serde(default)]
     pub audit_phase: Option<String>,
+    /// Cryptographic / tool execution receipts validating executed steps
+    #[serde(default)]
+    pub execution_receipts: Option<Vec<ExecutionReceipt>>,
+    /// Artifact evidence receipts verifying research and files
+    #[serde(default)]
+    pub evidence_receipts: Option<Vec<EvidenceReceipt>>,
+    /// Minimum required policy mode ("standard" or "deep"). Prevents caller from forcing 'quick' mode.
+    #[serde(default)]
+    pub min_policy_mode: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
@@ -63,12 +75,16 @@ pub struct UnifiedAuditReport {
     pub verdict: String,
     pub policy_score: f64,
     #[serde(default)]
+    pub diagnostic_score: f64,
+    #[serde(default)]
     pub composite_score: f64,
     #[serde(default)]
     pub audit_phase: String,
     #[serde(default)]
     pub is_delivery_authorized: bool,
     pub severity_summary: SeveritySummary,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub receipts_summary: Option<ReceiptsVerificationSummary>,
     pub math_breakdown: Value,
     pub critical_violations: Vec<String>,
     pub violations: Vec<AuditViolation>,
@@ -130,6 +146,23 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
     let is_quick = mode_str == "quick";
     let is_deep = mode_str == "deep";
 
+    // ── Policy mode requirement check ─────────────────────────────────────────
+    if let Some(ref min_mode) = input.min_policy_mode {
+        let min_lower = min_mode.to_lowercase();
+        if (min_lower == "standard" || min_lower == "deep") && is_quick {
+            return Err(format!(
+                "Policy constraint violated: caller requested mode='quick', but min_policy_mode requires '{}'",
+                min_mode
+            ));
+        }
+        if min_lower == "deep" && !is_deep {
+            return Err(format!(
+                "Policy constraint violated: caller requested mode='{}', but min_policy_mode requires 'deep'",
+                mode_str
+            ));
+        }
+    }
+
     // ── Resource limit guards (DoS / resource exhaustion prevention) ──────────
     if input.planned_tasks.len() > MAX_TASKS {
         return Err(format!(
@@ -151,6 +184,15 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
             input.executed_steps.len(),
             MAX_EXECUTED_STEPS
         ));
+    }
+    if let Some(ref receipts) = input.execution_receipts {
+        if receipts.len() > MAX_EXECUTED_STEPS {
+            return Err(format!(
+                "Resource limit exceeded: execution_receipts count {} > MAX_EXECUTED_STEPS {}",
+                receipts.len(),
+                MAX_EXECUTED_STEPS
+            ));
+        }
     }
     if let Some(ref code) = input.code_snippet {
         if code.len() > MAX_CODE_BYTES {
@@ -497,6 +539,19 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
                         ViolationSeverity::Critical,
                         "Reorder tasks according to DAG topological dependencies.",
                     );
+                } else if PlanDag::is_mutation_action(step) {
+                    add_violation(
+                        &mut violations,
+                        &mut critical_violations,
+                        &mut recommendations,
+                        "UNAPPROVED_MUTATION_SCOPE_CREEP",
+                        format!(
+                            "Critical Scope Creep: Unplanned mutating action '{}' executed outside approved plan DAG.",
+                            step
+                        ),
+                        ViolationSeverity::Critical,
+                        "All state-mutating actions must be formally specified and approved in the plan DAG prior to execution.",
+                    );
                 } else {
                     add_violation(
                         &mut violations,
@@ -512,7 +567,7 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
         }
 
         let metrics = dag.evaluate_metrics();
-        if metrics.scope_creep_count > 0 && !violations.iter().any(|v| v.code == "SCOPE_CREEP") {
+        if metrics.scope_creep_count > 0 && !violations.iter().any(|v| v.code == "SCOPE_CREEP" || v.code == "UNAPPROVED_MUTATION_SCOPE_CREEP") {
             add_violation(
                 &mut violations,
                 &mut critical_violations,
@@ -555,6 +610,83 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
             weight,
         });
         Some(metrics)
+    } else {
+        None
+    };
+
+    // 2.1 Execution Receipts Verification (Provenance Layer)
+    let receipts_summary = if !is_plan_phase && !input.executed_steps.is_empty() {
+        if let Some(ref receipts) = input.execution_receipts {
+            let total_receipts = receipts.len();
+            let mut matched_count = 0;
+            let mut failed_count = 0;
+            let mut unattested_steps = Vec::new();
+
+            for step in &input.executed_steps {
+                let matching: Vec<&ExecutionReceipt> = receipts.iter().filter(|r| r.action_id == *step).collect();
+                if matching.is_empty() {
+                    unattested_steps.push(step.clone());
+                    if is_deep {
+                        add_violation(
+                            &mut violations,
+                            &mut critical_violations,
+                            &mut recommendations,
+                            "UNATTESTED_EXECUTION_CLAIM",
+                            format!(
+                                "Deep Mode Invariant: Executed step '{}' has no cryptographic/machine-verifiable execution receipt.",
+                                step
+                            ),
+                            ViolationSeverity::Critical,
+                            "Provide an ExecutionReceipt with tool output hash or return code for every executed step.",
+                        );
+                    } else {
+                        add_violation(
+                            &mut violations,
+                            &mut critical_violations,
+                            &mut recommendations,
+                            "UNATTESTED_EXECUTION_CLAIM",
+                            format!(
+                                "Executed step '{}' is missing execution receipt verification.",
+                                step
+                            ),
+                            ViolationSeverity::Warning,
+                            "Provide ExecutionReceipts to verify execution integrity.",
+                        );
+                    }
+                } else {
+                    for r in matching {
+                        if let Some(exit_code) = r.exit_code {
+                            if exit_code != 0 {
+                                failed_count += 1;
+                                add_violation(
+                                    &mut violations,
+                                    &mut critical_violations,
+                                    &mut recommendations,
+                                    "FAILED_EXECUTION_RECEIPT",
+                                    format!(
+                                        "Execution Receipt for '{}' reported failure exit_code {}.",
+                                        step, exit_code
+                                    ),
+                                    ViolationSeverity::Critical,
+                                    "Ensure all executed tools and commands complete with exit code 0.",
+                                );
+                            }
+                        }
+                    }
+                    matched_count += 1;
+                }
+            }
+
+            Some(ReceiptsVerificationSummary {
+                total_receipts,
+                matched_steps_count: matched_count,
+                unattested_steps,
+                failed_receipts_count: failed_count,
+                has_full_provenance: failed_count == 0 && matched_count == input.executed_steps.len(),
+            })
+        } else {
+            None
+        }
     } else {
         None
     };
@@ -869,11 +1001,14 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
         ("WARN".to_string(), "WARN".to_string())
     } else if is_plan_phase {
         ("ALLOW".to_string(), "PLAN_APPROVED".to_string())
+    } else if is_quick {
+        // QUICK MODE CAN NEVER AUTHORIZE DELIVERY
+        ("CHECKPOINT_PASS".to_string(), "QUICK_PASS".to_string())
     } else {
         ("ALLOW".to_string(), "PASS".to_string())
     };
 
-    let is_delivery_authorized = decision == "ALLOW" && !is_plan_phase;
+    let is_delivery_authorized = decision == "ALLOW" && !is_plan_phase && !is_quick;
 
     let mut remediation_plan: Vec<String> = Vec::new();
     for v in &violations {
@@ -882,20 +1017,26 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
         }
     }
 
+    let diagnostic_score = policy_score;
+    let composite_score = policy_score;
+
     let report = UnifiedAuditReport {
         decision,
         verdict,
         policy_score,
+        diagnostic_score,
         composite_score,
         audit_phase: resolved_phase.to_string(),
         is_delivery_authorized,
         severity_summary,
+        receipts_summary: receipts_summary.clone(),
         math_breakdown: json!({
             "mode": mode_str,
             "audit_phase": resolved_phase,
             "is_delivery_authorized": is_delivery_authorized,
             "constraints": constraint_report,
             "dag": dag_report,
+            "receipts": receipts_summary,
             "text": text_report,
             "confidence": confidence_report,
             "research": research_report,
@@ -984,10 +1125,97 @@ mod tests {
         let result = execute_unified_audit(args);
         assert!(result.is_ok());
         let val = result.unwrap();
-        assert_eq!(val["decision"], "ALLOW");
+        assert_eq!(val["decision"], "CHECKPOINT_PASS");
+        assert_eq!(val["verdict"], "QUICK_PASS");
+        assert_eq!(val["is_delivery_authorized"], false);
         assert_eq!(val["math_breakdown"]["mode"], "quick");
         assert!(val["math_breakdown"]["code"].is_null());
         assert!(val["math_breakdown"]["research"].is_null());
+    }
+
+    #[test]
+    fn test_unified_audit_min_policy_mode_rejection() {
+        let args = json!({
+            "mode": "quick",
+            "min_policy_mode": "standard",
+            "user_requirements": ["test requirement"],
+        });
+        let result = execute_unified_audit(args);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Policy constraint violated"));
+    }
+
+    #[test]
+    fn test_unified_audit_unapproved_mutation_is_critical_block() {
+        let args = json!({
+            "user_requirements": ["implement feature"],
+            "planned_tasks": [
+                {"id": "t1", "name": "implement feature", "dependencies": []}
+            ],
+            "executed_steps": ["t1", "delete_production_database"],
+            "draft_response": "According to docs.rs, the implementation is complete: https://docs.rs/example"
+        });
+        let result = execute_unified_audit(args);
+        assert!(result.is_ok());
+        let val = result.unwrap();
+        assert_eq!(val["decision"], "BLOCK");
+        assert_eq!(val["verdict"], "FAIL");
+        let violations = val["violations"].as_array().unwrap();
+        assert!(violations.iter().any(|v| v["code"] == "UNAPPROVED_MUTATION_SCOPE_CREEP"));
+    }
+
+    #[test]
+    fn test_unified_audit_receipts_validation() {
+        let args = json!({
+            "user_requirements": ["implement feature"],
+            "planned_tasks": [
+                {"id": "t1", "name": "implement feature", "dependencies": []}
+            ],
+            "executed_steps": ["t1"],
+            "execution_receipts": [
+                {
+                    "action_id": "t1",
+                    "tool_name": "cargo_build",
+                    "exit_code": 0
+                }
+            ],
+            "draft_response": "According to docs.rs and RFC 1234, implementation is complete. See: https://docs.rs/example",
+            "code_snippet": "fn feature() -> bool { true }",
+            "language": "rust"
+        });
+        let result = execute_unified_audit(args);
+        assert!(result.is_ok());
+        let val = result.unwrap();
+        assert_eq!(val["decision"], "ALLOW");
+        assert_eq!(val["verdict"], "PASS");
+        assert_eq!(val["is_delivery_authorized"], true);
+        assert_eq!(val["receipts_summary"]["matched_steps_count"], 1);
+        assert_eq!(val["receipts_summary"]["failed_receipts_count"], 0);
+    }
+
+    #[test]
+    fn test_unified_audit_receipts_failure_exit_code() {
+        let args = json!({
+            "user_requirements": ["implement feature"],
+            "planned_tasks": [
+                {"id": "t1", "name": "implement feature", "dependencies": []}
+            ],
+            "executed_steps": ["t1"],
+            "execution_receipts": [
+                {
+                    "action_id": "t1",
+                    "tool_name": "cargo_test",
+                    "exit_code": 101
+                }
+            ],
+            "draft_response": "According to docs.rs, implementation is complete. See: https://docs.rs/example",
+        });
+        let result = execute_unified_audit(args);
+        assert!(result.is_ok());
+        let val = result.unwrap();
+        assert_eq!(val["decision"], "BLOCK");
+        let violations = val["violations"].as_array().unwrap();
+        assert!(violations.iter().any(|v| v["code"] == "FAILED_EXECUTION_RECEIPT"));
     }
 
     #[test]

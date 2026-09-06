@@ -71,12 +71,19 @@ impl ConstraintEngine {
 
         let is_aligned = missing.is_empty() && contradictions.is_empty() && scope_creep.is_empty();
 
+        let mut sorted_missing = missing;
+        sorted_missing.sort();
+        let mut sorted_scope_creep = scope_creep;
+        sorted_scope_creep.sort();
+        let mut sorted_contradictions = contradictions;
+        sorted_contradictions.sort();
+
         ConstraintReport {
             total_requirements,
             satisfied_requirements: satisfied_count,
-            missing_requirements: missing,
-            scope_creep_items: scope_creep,
-            contradictions,
+            missing_requirements: sorted_missing,
+            scope_creep_items: sorted_scope_creep,
+            contradictions: sorted_contradictions,
             alignment_score,
             is_aligned,
         }

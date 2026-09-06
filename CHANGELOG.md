@@ -4,6 +4,39 @@ All notable changes to `ai-verification-mcp` are documented here.
 
 ---
 
+## [0.10.0] — 2026-09-06 — True Evidence & Policy Enforcement Layer
+
+### Added
+- **Non-Authoritative Quick Mode Gate (`CHECKPOINT_PASS` / `QUICK_PASS`)**:
+  - `mode: "quick"` is strictly a rapid-loop diagnostic checkpoint and can NEVER authorize delivery (`is_delivery_authorized: false`).
+  - When passing in quick mode, the gate returns `decision: "CHECKPOINT_PASS"` and `verdict: "QUICK_PASS"`. Authoritative `ALLOW` requires `standard` or `deep` mode.
+- **Contract Enforcement Mode Guard (`min_policy_mode`)**:
+  - Callers or system policy can demand a minimum policy mode (`"standard"` or `"deep"`). Any attempt by an agent to force `mode: "quick"` is rejected with a hard error.
+- **Machine-Verifiable Receipts Layer (`ExecutionReceipt` & `EvidenceReceipt`)**:
+  - Introduced formal verification receipts distinguishing self-attested agent claims ($S_{\text{claim}}$) from verifiable tool executions ($S_{\text{receipt}}$).
+  - Executed steps without matching execution receipts produce `UNATTESTED_EXECUTION_CLAIM` (Critical in deep mode, Warning in standard mode).
+  - Receipts reporting non-zero exit codes trigger `FAILED_EXECUTION_RECEIPT` (Critical $\rightarrow$ `BLOCK`).
+  - Added `receipts_summary` with `total_receipts`, `matched_steps_count`, `unattested_steps`, `failed_receipts_count`, and `has_full_provenance`.
+- **Differentiated Mutation Scope Creep (`UNAPPROVED_MUTATION_SCOPE_CREEP`)**:
+  - Added `is_mutation_action()` identifying mutating verbs (`send`, `upload`, `post`, `delete`, `drop`, `write`, `alter`, etc.).
+  - Unapproved mutating actions outside the plan DAG are elevated to `ViolationSeverity::Critical` (`UNAPPROVED_MUTATION_SCOPE_CREEP` $\rightarrow$ `BLOCK`).
+  - Disqualified composite actions (e.g. `send_credentials_to_test`) from disguising as exploratory discovery.
+- **Canonical Evidence Hierarchy (`EvidenceClassifier`)**:
+  - 5-tier Provenance Level (`None`, `SyntacticMarker`, `AuthorityVerified`, `SourceVerified`, `ClaimSupported`).
+  - Eliminates evidence laundering: bare markdown code blocks and untrusted/placeholder domains are strictly syntactic markers without grounding exemption.
+- **Diff DoS Resilience & AST Complexity**:
+  - Common prefix and suffix line trimming before LCS computation.
+  - LCS table complexity capped at `MAX_LCS_CELLS` with greedy fallback for extreme inputs.
+  - `DiffAnalyzer` hooks into `CodeAnalyzer` for AST-backed cyclomatic complexity deltas.
+- **Deterministic Serialization**:
+  - `PlanDag` switched to `BTreeMap<String, PlanTask>` and constraint results are sorted prior to reporting for byte-for-byte deterministic serialization.
+- **Diagnostic Score Decoupling**:
+  - Exposes `diagnostic_score` as an informational health metric distinct from hard-invariant `policy_score` and `decision`.
+- **CI Hardening**:
+  - Removed `contents: write` auto-commit bot from CI; enforces strict read-only `cargo fmt --all -- --check`.
+
+---
+
 ## [0.9.1] — 2026-09-06 — Anti-Phase Spoofing Guard + MCP Revision 2026-07-28
 
 ### Added

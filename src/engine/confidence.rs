@@ -1,3 +1,4 @@
+use crate::engine::evidence_classifier::EvidenceClassifier;
 use crate::engine::text_utils::{smart_split_sentences, AI_FILLER_PHRASES, HEDGING_PHRASES, OVERCONFIDENCE_PHRASES};
 use serde::{Deserialize, Serialize};
 
@@ -115,26 +116,9 @@ impl ConfidenceAnalyzer {
             0.0
         };
 
-        let has_hard_evidence = trimmed.contains("```")
-            || trimmed.contains("http://")
-            || trimmed.contains("https://")
-            || trimmed.contains(".rs")
-            || trimmed.contains(".ts")
-            || trimmed.contains(".js")
-            || trimmed.contains(".py")
-            || trimmed.contains(".go")
-            || trimmed.contains(".java")
-            || trimmed.contains(".c")
-            || trimmed.contains(".cpp")
-            || trimmed.contains(".toml")
-            || trimmed.contains(".json")
-            || trimmed.contains(".yaml")
-            || trimmed.contains(".yml")
-            || trimmed.to_lowercase().contains("rfc")
-            || trimmed.contains("IEEE")
-            || trimmed.contains("ISO")
-            || trimmed.contains("C:\\")
-            || trimmed.contains("D:\\")
+        let has_hard_evidence = EvidenceClassifier::classify_sentence(trimmed).max_provenance.is_grounded()
+            || trimmed.to_lowercase().contains("benchmark")
+            || trimmed.to_lowercase().contains("coverage")
             || (trimmed.contains('/')
                 && (trimmed.contains("/var")
                     || trimmed.contains("/etc")
@@ -179,15 +163,9 @@ impl ConfidenceAnalyzer {
                         continue;
                     }
 
-                    // Per-sentence evidence binding to prevent Evidence Laundering
-                    let sentence_has_direct_evidence = lower_sentence.contains("http://")
-                        || lower_sentence.contains("https://")
-                        || lower_sentence.contains(".rs")
-                        || lower_sentence.contains(".ts")
-                        || lower_sentence.contains(".go")
-                        || lower_sentence.contains(".py")
-                        || sentence.contains("```")
-                        || lower_sentence.contains("rfc ")
+                    // Canonical per-sentence evidence verification to prevent Evidence Laundering
+                    let ev = EvidenceClassifier::classify_sentence(sentence);
+                    let sentence_has_direct_evidence = ev.max_provenance.is_grounded()
                         || lower_sentence.contains("benchmark")
                         || lower_sentence.contains("coverage");
 
@@ -487,5 +465,21 @@ mod tests {
         let report = ConfidenceAnalyzer::analyze(text);
         assert_eq!(report.calibration_score, 0.0);
         assert_eq!(report.verdict, "EVASIVE");
+    }
+
+    #[test]
+    fn test_untrusted_url_cannot_launder_overconfidence() {
+        let text = "This solution is guaranteed 100% flawless and will never fail: https://attacker.example/proof";
+        let report = ConfidenceAnalyzer::analyze(text);
+        assert_eq!(report.verdict, "OVERCONFIDENT");
+        assert!(!report.unverified_claims.is_empty());
+    }
+
+    #[test]
+    fn test_code_block_cannot_launder_overconfidence() {
+        let text = "This solution is guaranteed 100% flawless and will never fail: ```rust fn foo() {} ```";
+        let report = ConfidenceAnalyzer::analyze(text);
+        assert_eq!(report.verdict, "OVERCONFIDENT");
+        assert!(!report.unverified_claims.is_empty());
     }
 }
