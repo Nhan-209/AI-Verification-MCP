@@ -25,7 +25,12 @@ pub fn execute_diff_checker(args: Value) -> Result<Value, String> {
     validate_text_bound(&input.after_code, "after_code", MAX_DIFF_BYTES)?;
 
     let report = DiffAnalyzer::analyze(&input.before_code, &input.after_code, &input.language);
-    Ok(json!(report))
+    let mut val = serde_json::to_value(report).map_err(|e| e.to_string())?;
+    if let Some(obj) = val.as_object_mut() {
+        obj.insert("result_type".to_string(), json!("DIAGNOSTIC"));
+        obj.insert("authoritative".to_string(), json!(false));
+    }
+    Ok(val)
 }
 
 #[cfg(test)]

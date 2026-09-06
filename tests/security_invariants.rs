@@ -431,6 +431,24 @@ fn invariant_execution_phase_authorizes_delivery_on_allow() {
             {"id": "t2", "name": "add tests", "dependencies": ["t1"]}
         ],
         "executed_steps": ["t1", "t2"],
+        "execution_receipts": [
+            {
+                "receipt_id": "rcpt-t1-valid",
+                "action_id": "t1",
+                "tool_name": "cargo_test",
+                "arguments_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                "result_hash": "88d4266fd4e6338d13b845fcf289579d209c897823b9217da3e161936f031589",
+                "exit_code": 0
+            },
+            {
+                "receipt_id": "rcpt-t2-valid",
+                "action_id": "t2",
+                "tool_name": "cargo_test",
+                "arguments_hash": "a1b2c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef0",
+                "result_hash": "b2c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef01a",
+                "exit_code": 0
+            }
+        ],
         "draft_response": "According to docs.rs and RFC 1234, the helper is implemented in helper.rs. See: https://docs.rs/example",
         "code_snippet": "fn helper() -> Result<bool, String> { Ok(true) }",
         "language": "rust"
@@ -548,4 +566,201 @@ fn invariant_execution_receipts_verified_and_failures_block() {
     assert!(violations_deep
         .iter()
         .any(|v| v["code"] == "UNATTESTED_EXECUTION_CLAIM"));
+}
+
+// ─── Invariant: Execution Phase requires Executed Steps (P0 #1) ──────────────
+
+#[test]
+fn test_execution_phase_without_steps_never_allows() {
+    let payload = json!({
+        "mode": "standard",
+        "audit_phase": "execution",
+        "user_requirements": ["implement feature"],
+        "planned_tasks": [
+            {"id": "t1", "name": "implement feature", "dependencies": []}
+        ],
+        "executed_steps": []
+    });
+    let res = execute_unified_audit(payload).expect("audit must evaluate");
+    assert_ne!(res["decision"], "ALLOW");
+    assert_eq!(res["is_delivery_authorized"], false);
+    let violations = res["violations"].as_array().unwrap();
+    assert!(violations.iter().any(|v| v["code"] == "EXECUTION_EVIDENCE_MISSING"));
+}
+
+#[test]
+fn test_deep_execution_phase_without_steps_blocks() {
+    let payload = json!({
+        "mode": "deep",
+        "audit_phase": "execution",
+        "user_requirements": ["implement feature"],
+        "planned_tasks": [
+            {"id": "t1", "name": "implement feature", "dependencies": []}
+        ],
+        "executed_steps": []
+    });
+    let res = execute_unified_audit(payload).expect("audit must evaluate");
+    assert_eq!(res["decision"], "BLOCK");
+    assert_eq!(res["is_delivery_authorized"], false);
+    let violations = res["violations"].as_array().unwrap();
+    assert!(violations.iter().any(|v| v["code"] == "EXECUTION_EVIDENCE_MISSING"));
+}
+
+// ─── Invariant: Executed step without receipt produces UNATTESTED_EXECUTION_CLAIM (P0 #3) ──
+
+#[test]
+fn test_execution_phase_requires_receipt() {
+    let payload = json!({
+        "audit_phase": "execution",
+        "user_requirements": ["implement feature"],
+        "planned_tasks": [
+            {"id": "t1", "name": "implement feature", "dependencies": []}
+        ],
+        "executed_steps": ["t1"]
+    });
+    let res = execute_unified_audit(payload).expect("audit must evaluate");
+    assert_ne!(res["decision"], "ALLOW");
+    assert_eq!(res["is_delivery_authorized"], false);
+    let violations = res["violations"].as_array().unwrap();
+    assert!(violations.iter().any(|v| v["code"] == "UNATTESTED_EXECUTION_CLAIM"));
+}
+
+// ─── Invariant: Fake Receipt without hashes does not grant full provenance (P0 #2) ──
+
+#[test]
+fn test_fake_receipt_without_hashes_rejected() {
+    let payload = json!({
+        "audit_phase": "execution",
+        "user_requirements": ["implement feature"],
+        "planned_tasks": [
+            {"id": "t1", "name": "implement feature", "dependencies": []}
+        ],
+        "executed_steps": ["t1"],
+        "execution_receipts": [
+            {
+                "action_id": "t1",
+                "tool_name": "cargo_test",
+                "exit_code": 0
+            }
+        ],
+        "draft_response": "Feature verified via RFC 2119 in src/lib.rs"
+    });
+    let res = execute_unified_audit(payload).expect("audit must evaluate");
+    assert_eq!(res["is_delivery_authorized"], false);
+    let receipts_summary = &res["receipts_summary"];
+    assert_eq!(receipts_summary["has_full_provenance"], false);
+    assert!(receipts_summary["unverifiable_receipts_count"].as_u64().unwrap() > 0);
+}
+
+// ─── Invariant: EvidenceReceipt enforcement (P0 #4) ──────────────────────────
+
+#[test]
+fn test_evidence_receipt_enforcement() {
+    let payload = json!({
+        "user_requirements": ["verify performance"],
+        "planned_tasks": [
+            {"id": "t1", "name": "verify performance", "dependencies": []}
+        ],
+        "executed_steps": ["t1"],
+        "execution_receipts": [
+            {
+                "action_id": "t1",
+                "tool_name": "benchmark_tool",
+                "arguments_hash": "a1b2c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef0",
+                "result_hash": "b2c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef01a",
+                "exit_code": 0
+            }
+        ],
+        "evidence_receipts": [
+            {
+                "kind": "FILE",
+                "source_id": "src/lib.rs",
+                "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                "claim_binding": "Throughput benchmark reaches 50k ops/s"
+            }
+        ],
+        "draft_response": "Throughput benchmark reaches 50k ops/s as documented in src/lib.rs per RFC 2119."
+    });
+    let res = execute_unified_audit(payload).expect("audit must evaluate");
+    assert_eq!(res["decision"], "ALLOW");
+    assert_eq!(res["verdict"], "PASS");
+    assert_eq!(res["is_delivery_authorized"], true);
+}
+
+// ─── Invariant: Diagnostic Tools are Explicitly Non-Authoritative ─────────────
+
+#[test]
+fn test_diagnostic_tools_report_non_authoritative() {
+    use ai_verification_mcp::tools::*;
+
+    // 1. verify_dag
+    let dag_res = execute_plan_tracker(json!({
+        "tasks": [{"id": "t1", "name": "step 1", "dependencies": []}],
+        "executed_steps": ["t1"]
+    }))
+    .expect("plan tracker must succeed");
+    assert_eq!(dag_res["result_type"], "DIAGNOSTIC");
+    assert_eq!(dag_res["authoritative"], false);
+
+    // 2. verify_code
+    let code_res = execute_code_evaluator(json!({
+        "code": "fn test() -> bool { true }",
+        "language": "rust"
+    }))
+    .expect("code evaluator must succeed");
+    assert_eq!(code_res["result_type"], "DIAGNOSTIC");
+    assert_eq!(code_res["authoritative"], false);
+
+    // 3. verify_text
+    let text_res = execute_text_evaluator(json!({
+        "text": "Information theory provides mathematical definitions for entropy."
+    }))
+    .expect("text evaluator must succeed");
+    assert_eq!(text_res["result_type"], "DIAGNOSTIC");
+    assert_eq!(text_res["authoritative"], false);
+
+    // 4. verify_confidence
+    let conf_res = execute_confidence_checker(json!({
+        "text": "The library is available at https://crates.io with test coverage."
+    }))
+    .expect("confidence checker must succeed");
+    assert_eq!(conf_res["result_type"], "DIAGNOSTIC");
+    assert_eq!(conf_res["authoritative"], false);
+
+    // 5. verify_diff
+    let diff_res = execute_diff_checker(json!({
+        "before_code": "let a = 1;",
+        "after_code": "let a = 2;",
+        "language": "rust"
+    }))
+    .expect("diff checker must succeed");
+    assert_eq!(diff_res["result_type"], "DIAGNOSTIC");
+    assert_eq!(diff_res["authoritative"], false);
+
+    // 6. verify_foresight
+    let fore_res = execute_foresight_checker(json!({
+        "text": "Includes fallback error recovery and edge cases.",
+        "requirements_count": 2,
+        "planned_tasks_count": 2
+    }))
+    .expect("foresight checker must succeed");
+    assert_eq!(fore_res["result_type"], "DIAGNOSTIC");
+    assert_eq!(fore_res["authoritative"], false);
+
+    // 7. verify_research
+    let res_res = execute_research_checker(json!({
+        "text": "According to RFC 2119, MUST indicates requirement."
+    }))
+    .expect("research checker must succeed");
+    assert_eq!(res_res["result_type"], "DIAGNOSTIC");
+    assert_eq!(res_res["authoritative"], false);
+
+    // 8. verify_constraints
+    let cons_res = execute_constraint_checker(json!({
+        "requirements": ["must support async"],
+        "implementations": ["fully supports async processing"]
+    }))
+    .expect("constraint checker must succeed");
+    assert_eq!(cons_res["result_type"], "DIAGNOSTIC");
+    assert_eq!(cons_res["authoritative"], false);
 }

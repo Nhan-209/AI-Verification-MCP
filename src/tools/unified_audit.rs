@@ -227,7 +227,7 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
             ));
         }
         None => {
-            if input.executed_steps.is_empty() && !input.planned_tasks.is_empty() {
+            if input.executed_steps.is_empty() {
                 "plan"
             } else {
                 "execution"
@@ -301,6 +301,23 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
                 );
             }
         }
+    }
+
+    // ── Execution Phase Invariants (Anti-Evasion Gate) ────────────────────────
+    if input.audit_phase.as_deref() == Some("execution") && input.executed_steps.is_empty() {
+        add_violation(
+            &mut violations,
+            &mut critical_violations,
+            &mut recommendations,
+            "EXECUTION_EVIDENCE_MISSING",
+            "Execution Phase Invariant Violation: audit_phase is 'execution', but 'executed_steps' is empty. An execution audit requires verified execution evidence to authorize delivery.".to_string(),
+            if is_deep {
+                ViolationSeverity::Critical
+            } else {
+                ViolationSeverity::Warning
+            },
+            "Provide executed_steps and matching execution_receipts before auditing under execution phase, or switch audit_phase to 'plan'.",
+        );
     }
 
     // Deep Mode Invariants: In deep governance mode, explicit requirements and plan DAG are mandatory
@@ -619,17 +636,23 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
     };
 
     // 2.1 Execution Receipts Verification (Provenance Layer)
-    let receipts_summary = if !is_plan_phase && !input.executed_steps.is_empty() {
-        if let Some(ref receipts) = input.execution_receipts {
-            let total_receipts = receipts.len();
-            let mut matched_count = 0;
-            let mut failed_count = 0;
-            let mut unattested_steps = Vec::new();
+    let receipts_summary = if !is_plan_phase && !is_quick && !input.executed_steps.is_empty() {
+        let empty_receipts = Vec::new();
+        let receipts = input.execution_receipts.as_deref().unwrap_or(&empty_receipts);
+        let total_receipts = receipts.len();
+        let mut matched_count = 0;
+        let mut failed_count = 0;
+        let mut unverifiable_count = 0;
+        let mut unattested_steps = Vec::new();
 
-            for step in &input.executed_steps {
-                let matching: Vec<&ExecutionReceipt> = receipts.iter().filter(|r| r.action_id == *step).collect();
-                if matching.is_empty() {
-                    unattested_steps.push(step.clone());
+        let require_receipt_violations =
+            input.execution_receipts.is_some() || input.audit_phase.as_deref() == Some("execution") || is_deep;
+
+        for step in &input.executed_steps {
+            let matching: Vec<&ExecutionReceipt> = receipts.iter().filter(|r| r.action_id == *step).collect();
+            if matching.is_empty() {
+                unattested_steps.push(step.clone());
+                if require_receipt_violations {
                     if is_deep {
                         add_violation(
                             &mut violations,
@@ -641,7 +664,7 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
                                 step
                             ),
                             ViolationSeverity::Critical,
-                            "Provide an ExecutionReceipt with tool output hash or return code for every executed step.",
+                            "Provide an ExecutionReceipt with tool output hash and return code for every executed step.",
                         );
                     } else {
                         add_violation(
@@ -651,43 +674,83 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
                             "UNATTESTED_EXECUTION_CLAIM",
                             format!("Executed step '{}' is missing execution receipt verification.", step),
                             ViolationSeverity::Warning,
-                            "Provide ExecutionReceipts to verify execution integrity.",
+                            "Provide ExecutionReceipts to verify execution integrity before delivery.",
                         );
                     }
-                } else {
-                    for r in matching {
-                        if let Some(exit_code) = r.exit_code {
-                            if exit_code != 0 {
-                                failed_count += 1;
-                                add_violation(
-                                    &mut violations,
-                                    &mut critical_violations,
-                                    &mut recommendations,
-                                    "FAILED_EXECUTION_RECEIPT",
-                                    format!(
-                                        "Execution Receipt for '{}' reported failure exit_code {}.",
-                                        step, exit_code
-                                    ),
-                                    ViolationSeverity::Critical,
-                                    "Ensure all executed tools and commands complete with exit code 0.",
-                                );
-                            }
+                }
+            } else {
+                for r in matching {
+                    // Check exit_code: None is unverifiable, cannot be assumed success
+                    match r.exit_code {
+                        None => {
+                            unverifiable_count += 1;
+                            add_violation(
+                                &mut violations,
+                                &mut critical_violations,
+                                &mut recommendations,
+                                "UNVERIFIABLE_RECEIPT",
+                                format!(
+                                    "Execution Receipt for '{}' missing exit_code (execution outcome unverifiable).",
+                                    step
+                                ),
+                                if is_deep {
+                                    ViolationSeverity::Critical
+                                } else {
+                                    ViolationSeverity::Warning
+                                },
+                                "Execution receipts must provide explicit integer exit_code (0 for success).",
+                            );
                         }
+                        Some(code) if code != 0 => {
+                            failed_count += 1;
+                            add_violation(
+                                &mut violations,
+                                &mut critical_violations,
+                                &mut recommendations,
+                                "FAILED_EXECUTION_RECEIPT",
+                                format!("Execution Receipt for '{}' reported failure exit_code {}.", step, code),
+                                ViolationSeverity::Critical,
+                                "Ensure all executed tools and commands complete with exit code 0.",
+                            );
+                        }
+                        Some(_) => {}
                     }
-                    matched_count += 1;
+
+                    // Check machine-verifiability (arguments_hash & result_hash must be present and non-empty)
+                    if !r.is_machine_verifiable() {
+                        unverifiable_count += 1;
+                        add_violation(
+                            &mut violations,
+                            &mut critical_violations,
+                            &mut recommendations,
+                            "UNVERIFIABLE_RECEIPT",
+                            format!(
+                                "Execution Receipt for '{}' lacks required cryptographic hashes (arguments_hash or result_hash missing).",
+                                step
+                            ),
+                            if is_deep { ViolationSeverity::Critical } else { ViolationSeverity::Warning },
+                            "Provide non-empty arguments_hash and result_hash in ExecutionReceipt.",
+                        );
+                    } else if r.exit_code == Some(0) {
+                        matched_count += 1;
+                    }
                 }
             }
-
-            Some(ReceiptsVerificationSummary {
-                total_receipts,
-                matched_steps_count: matched_count,
-                unattested_steps,
-                failed_receipts_count: failed_count,
-                has_full_provenance: failed_count == 0 && matched_count == input.executed_steps.len(),
-            })
-        } else {
-            None
         }
+
+        let has_full_provenance = failed_count == 0
+            && unverifiable_count == 0
+            && matched_count == input.executed_steps.len()
+            && total_receipts > 0;
+
+        Some(ReceiptsVerificationSummary {
+            total_receipts,
+            matched_steps_count: matched_count,
+            unattested_steps,
+            unverifiable_receipts_count: unverifiable_count,
+            failed_receipts_count: failed_count,
+            has_full_provenance,
+        })
     } else {
         None
     };
@@ -773,8 +836,42 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
 
     // 4. Research Gate Evaluation (Skipped in quick mode)
     let research_report = if !is_quick {
+        // Validate evidence receipts artifact integrity
+        if let Some(ref ev_receipts) = input.evidence_receipts {
+            for er in ev_receipts {
+                if !er.is_valid_evidence() {
+                    add_violation(
+                        &mut violations,
+                        &mut critical_violations,
+                        &mut recommendations,
+                        "INVALID_EVIDENCE_RECEIPT",
+                        format!("Evidence Receipt has empty kind or source_id: {:?}", er),
+                        ViolationSeverity::Warning,
+                        "Ensure EvidenceReceipt specifies non-empty kind and source_id.",
+                    );
+                } else if er.kind.to_uppercase() == "FILE" && !std::path::Path::new(&er.source_id).exists() {
+                    add_violation(
+                        &mut violations,
+                        &mut critical_violations,
+                        &mut recommendations,
+                        "EVIDENCE_ARTIFACT_NOT_FOUND",
+                        format!(
+                            "Evidence Receipt file artifact '{}' does not exist on disk.",
+                            er.source_id
+                        ),
+                        if is_deep {
+                            ViolationSeverity::Critical
+                        } else {
+                            ViolationSeverity::Warning
+                        },
+                        "Verify file path exists before attaching file evidence receipt.",
+                    );
+                }
+            }
+        }
+
         if let Some(ref text) = input.draft_response {
-            let r_rep = ResearchGate::audit(text);
+            let r_rep = ResearchGate::audit_with_evidence(text, input.evidence_receipts.as_deref());
             if r_rep.has_research_deficit {
                 let ungrounded_count = r_rep.unverified_claims.len();
                 add_violation(
@@ -787,7 +884,7 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
                         ungrounded_count, r_rep.unverified_claims
                     ),
                     ViolationSeverity::Critical,
-                    "Ground every factual claim with official documentation links, RFCs, or benchmark citations.",
+                    "Ground every factual claim with official documentation links, RFCs, or verified evidence receipts.",
                 );
             }
             for rec in &r_rep.recommendations {
@@ -960,7 +1057,7 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
         );
     }
 
-    let policy_score = if !has_any_input || weighted_scores.is_empty() {
+    let diagnostic_score = if !has_any_input || weighted_scores.is_empty() {
         0.0
     } else {
         let total_weight: f64 = weighted_scores.iter().map(|ws| ws.weight).sum();
@@ -991,6 +1088,17 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
         info: info_count,
     };
 
+    // Policy score is determined strictly by deterministic invariant compliance
+    let policy_score = if critical_count > 0 || !has_any_input || !mandatory_contract_met {
+        0.0
+    } else if warning_count > 0 {
+        (diagnostic_score * 0.8).min(74.0)
+    } else {
+        diagnostic_score
+    };
+
+    let composite_score = (policy_score * 0.7) + (diagnostic_score * 0.3);
+
     let (decision, verdict) = if critical_count > 0 {
         ("BLOCK".to_string(), "FAIL".to_string())
     } else if !has_any_input || weighted_scores.is_empty() || !mandatory_contract_met {
@@ -1008,7 +1116,20 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
         ("ALLOW".to_string(), "PASS".to_string())
     };
 
-    let is_delivery_authorized = decision == "ALLOW" && !is_plan_phase && !is_quick;
+    let has_full_receipt_provenance = if is_plan_phase {
+        true
+    } else {
+        receipts_summary
+            .as_ref()
+            .map(|s| s.has_full_provenance)
+            .unwrap_or(false)
+    };
+
+    let is_delivery_authorized = decision == "ALLOW"
+        && !is_plan_phase
+        && !is_quick
+        && !input.executed_steps.is_empty()
+        && has_full_receipt_provenance;
 
     let mut remediation_plan: Vec<String> = Vec::new();
     for v in &violations {
@@ -1016,9 +1137,6 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
             remediation_plan.push(v.remediation.clone());
         }
     }
-
-    let diagnostic_score = policy_score;
-    let composite_score = policy_score;
 
     let report = UnifiedAuditReport {
         decision,
@@ -1078,7 +1196,25 @@ mod tests {
                 {"id": "t2", "name": "add tests", "dependencies": ["t1"]}
             ],
             "executed_steps": ["t1", "t2"],
-            "draft_response": "According to docs.rs and RFC 1234, the helper is implemented in helper.rs with assertions, fallback retry, and unit test coverage. See: https://docs.rs/example",
+            "execution_receipts": [
+                {
+                    "receipt_id": "rcpt-t1-valid",
+                    "action_id": "t1",
+                    "tool_name": "cargo_test",
+                    "arguments_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                    "result_hash": "88d4266fd4e6338d13b845fcf289579d209c897823b9217da3e161936f031589",
+                    "exit_code": 0
+                },
+                {
+                    "receipt_id": "rcpt-t2-valid",
+                    "action_id": "t2",
+                    "tool_name": "cargo_test",
+                    "arguments_hash": "a1b2c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef0",
+                    "result_hash": "b2c3d4e5f60718293a4b5c6d7e8f90123456789abcdef0123456789abcdef01a",
+                    "exit_code": 0
+                }
+            ],
+            "draft_response": "According to RFC 2119, the helper is implemented in src/lib.rs with assertions, fallback retry, and unit test coverage. Reference: https://docs.rs/serde",
             "code_snippet": "fn helper() -> Result<bool, String> { Ok(true) }",
             "language": "rust"
         });
@@ -1088,9 +1224,9 @@ mod tests {
         assert_eq!(val["decision"], "ALLOW");
         assert_eq!(val["verdict"], "PASS");
         assert!(val["composite_score"].as_f64().unwrap() > 70.0);
-        assert_eq!(val["policy_score"], val["composite_score"]);
         assert_eq!(val["severity_summary"]["critical"], 0);
         assert!(val["critical_violations"].as_array().unwrap().is_empty());
+        assert_eq!(val["is_delivery_authorized"], true);
     }
 
     #[test]
@@ -1176,8 +1312,11 @@ mod tests {
             "executed_steps": ["t1"],
             "execution_receipts": [
                 {
+                    "receipt_id": "rcpt-t1-build",
                     "action_id": "t1",
                     "tool_name": "cargo_build",
+                    "arguments_hash": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+                    "result_hash": "88d4266fd4e6338d13b845fcf289579d209c897823b9217da3e161936f031589",
                     "exit_code": 0
                 }
             ],

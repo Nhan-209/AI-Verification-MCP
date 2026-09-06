@@ -18,8 +18,25 @@ pub enum ProvenanceLevel {
 }
 
 impl ProvenanceLevel {
-    pub fn is_grounded(&self) -> bool {
+    /// True if hostname is in the authoritative domain list.
+    pub fn is_authoritative(&self) -> bool {
         *self >= ProvenanceLevel::AuthorityVerified
+    }
+
+    /// True if the source or artifact existence has been verified (RFC in registry, local file on disk).
+    pub fn is_source_verified(&self) -> bool {
+        *self >= ProvenanceLevel::SourceVerified
+    }
+
+    /// True strictly when evidence is at least SourceVerified.
+    /// AuthorityVerified alone (hostname without document fetch/verification) is NOT sufficient.
+    pub fn is_grounded(&self) -> bool {
+        *self >= ProvenanceLevel::SourceVerified
+    }
+
+    /// True if a factual claim is directly supported by a bound, verified cryptographic artifact receipt.
+    pub fn is_claim_supported(&self) -> bool {
+        *self >= ProvenanceLevel::ClaimSupported
     }
 }
 
@@ -292,6 +309,7 @@ mod tests {
         let auth_doc = "Refer to https://docs.rs/serde for serialization details.";
         let ev4 = EvidenceClassifier::classify_sentence(auth_doc);
         assert_eq!(ev4.max_provenance, ProvenanceLevel::AuthorityVerified);
-        assert!(ev4.max_provenance.is_grounded());
+        assert!(ev4.max_provenance.is_authoritative());
+        assert!(!ev4.max_provenance.is_grounded());
     }
 }

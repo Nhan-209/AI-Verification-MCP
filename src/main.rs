@@ -1,3 +1,4 @@
+use ai_verification_mcp::engine::resource_limits::MAX_JSON_REQUEST_BYTES;
 use ai_verification_mcp::mcp;
 use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 
@@ -13,6 +14,30 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             trimmed = &trimmed['\u{feff}'.len_utf8()..];
         }
         if trimmed.is_empty() {
+            continue;
+        }
+
+        // Transport-level frame size guard against DoS payload exhaustion
+        if trimmed.len() > MAX_JSON_REQUEST_BYTES {
+            let err_response = mcp::JsonRpcResponse {
+                jsonrpc: "2.0".to_string(),
+                id: None,
+                result: None,
+                error: Some(mcp::protocol::JsonRpcError {
+                    code: -32600,
+                    message: format!(
+                        "Invalid Request: Request frame size {} bytes exceeds transport limit of {} bytes",
+                        trimmed.len(),
+                        MAX_JSON_REQUEST_BYTES
+                    ),
+                    data: None,
+                }),
+            };
+            if let Ok(mut response_bytes) = serde_json::to_vec(&err_response) {
+                response_bytes.push(b'\n');
+                let _ = stdout.write_all(&response_bytes).await;
+                let _ = stdout.flush().await;
+            }
             continue;
         }
 

@@ -15,7 +15,12 @@ pub fn execute_research_checker(args: Value) -> Result<Value, String> {
     validate_text_bound(&input.text, "text", MAX_TEXT_BYTES)?;
 
     let report = ResearchGate::audit(&input.text);
-    Ok(json!(report))
+    let mut val = serde_json::to_value(report).map_err(|e| e.to_string())?;
+    if let Some(obj) = val.as_object_mut() {
+        obj.insert("result_type".to_string(), json!("DIAGNOSTIC"));
+        obj.insert("authoritative".to_string(), json!(false));
+    }
+    Ok(val)
 }
 
 #[cfg(test)]

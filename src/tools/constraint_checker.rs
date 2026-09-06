@@ -29,7 +29,12 @@ pub fn execute_constraint_checker(args: Value) -> Result<Value, String> {
     }
 
     let report = ConstraintEngine::verify(&input.requirements, &input.implementations);
-    Ok(json!(report))
+    let mut val = serde_json::to_value(report).map_err(|e| e.to_string())?;
+    if let Some(obj) = val.as_object_mut() {
+        obj.insert("result_type".to_string(), json!("DIAGNOSTIC"));
+        obj.insert("authoritative".to_string(), json!(false));
+    }
+    Ok(val)
 }
 
 #[cfg(test)]
