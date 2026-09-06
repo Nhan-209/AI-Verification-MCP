@@ -687,7 +687,11 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
                                     "Execution Receipt for '{}' missing exit_code (execution outcome unverifiable).",
                                     step
                                 ),
-                                if is_deep { ViolationSeverity::Critical } else { ViolationSeverity::Warning },
+                                if is_deep {
+                                    ViolationSeverity::Critical
+                                } else {
+                                    ViolationSeverity::Warning
+                                },
                                 "Execution receipts must provide explicit integer exit_code (0 for success).",
                             );
                         }
@@ -698,10 +702,7 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
                                 &mut critical_violations,
                                 &mut recommendations,
                                 "FAILED_EXECUTION_RECEIPT",
-                                format!(
-                                    "Execution Receipt for '{}' reported failure exit_code {}.",
-                                    step, code
-                                ),
+                                format!("Execution Receipt for '{}' reported failure exit_code {}.", step, code),
                                 ViolationSeverity::Critical,
                                 "Ensure all executed tools and commands complete with exit code 0.",
                             );
@@ -848,8 +849,15 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
                         &mut critical_violations,
                         &mut recommendations,
                         "EVIDENCE_ARTIFACT_NOT_FOUND",
-                        format!("Evidence Receipt file artifact '{}' does not exist on disk.", er.source_id),
-                        if is_deep { ViolationSeverity::Critical } else { ViolationSeverity::Warning },
+                        format!(
+                            "Evidence Receipt file artifact '{}' does not exist on disk.",
+                            er.source_id
+                        ),
+                        if is_deep {
+                            ViolationSeverity::Critical
+                        } else {
+                            ViolationSeverity::Warning
+                        },
                         "Verify file path exists before attaching file evidence receipt.",
                     );
                 }
@@ -1107,7 +1115,10 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
     let has_full_receipt_provenance = if is_plan_phase {
         true
     } else {
-        receipts_summary.as_ref().map(|s| s.has_full_provenance).unwrap_or(false)
+        receipts_summary
+            .as_ref()
+            .map(|s| s.has_full_provenance)
+            .unwrap_or(false)
     };
 
     let is_delivery_authorized = decision == "ALLOW"

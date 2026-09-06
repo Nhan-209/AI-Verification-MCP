@@ -298,8 +298,13 @@ impl ResearchGate {
                     if !r.is_valid_evidence() {
                         continue;
                     }
-                    let binds_claim = r.claim_binding.as_ref()
-                        .map(|b| !b.trim().is_empty() && (lower.contains(&b.to_lowercase()) || b.to_lowercase().contains(&lower)))
+                    let binds_claim = r
+                        .claim_binding
+                        .as_ref()
+                        .map(|b| {
+                            !b.trim().is_empty()
+                                && (lower.contains(&b.to_lowercase()) || b.to_lowercase().contains(&lower))
+                        })
                         .unwrap_or(false);
                     let mentions_source = lower.contains(&r.source_id.to_lowercase());
 
@@ -314,18 +319,23 @@ impl ResearchGate {
                                     false
                                 }
                             }
-                            "DOCS_URL" => {
-                                Self::extract_hostname(&r.source_id.to_lowercase())
-                                    .map(|h| AUTHORITATIVE_DOMAINS.iter().any(|&d| h == d || h.ends_with(&format!(".{}", d))))
-                                    .unwrap_or(false)
-                            }
+                            "DOCS_URL" => Self::extract_hostname(&r.source_id.to_lowercase())
+                                .map(|h| {
+                                    AUTHORITATIVE_DOMAINS
+                                        .iter()
+                                        .any(|&d| h == d || h.ends_with(&format!(".{}", d)))
+                                })
+                                .unwrap_or(false),
                             "TEST_RUN" | "AST_REPORT" => r.sha256.is_some(),
                             _ => true,
                         };
 
                         if is_valid_artifact {
                             receipt_supported = true;
-                            detected_sources.push(format!("Verified EvidenceReceipt [{}] for claim: '{}'", r.kind, r.source_id));
+                            detected_sources.push(format!(
+                                "Verified EvidenceReceipt [{}] for claim: '{}'",
+                                r.kind, r.source_id
+                            ));
                             break;
                         }
                     }

@@ -39,7 +39,11 @@ impl ExecutionReceipt {
         !self.action_id.trim().is_empty()
             && !self.tool_name.trim().is_empty()
             && self.exit_code.is_some()
-            && self.arguments_hash.as_ref().map(|h| !h.trim().is_empty()).unwrap_or(false)
+            && self
+                .arguments_hash
+                .as_ref()
+                .map(|h| !h.trim().is_empty())
+                .unwrap_or(false)
             && self.result_hash.as_ref().map(|h| !h.trim().is_empty()).unwrap_or(false)
     }
 }
