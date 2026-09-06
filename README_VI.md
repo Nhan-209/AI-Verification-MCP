@@ -178,6 +178,12 @@ Toàn bộ công cụ hỗ trợ 100% bí danh ngược (backward-compatible) ch
 
 File binary độc lập cho **Linux (x86_64)** và **Windows (x86_64)** được tự động biên dịch trên mỗi commit/release qua [GitHub Actions](https://github.com/Nhan-209/mcp-plugin-math/actions). Cả hai file thực thi `ai-verification-mcp` và `mcp-plugin-math` đều được xuất xưởng giống hệt nhau.
 
+### 🌐 Giao Thức Truyền Tải, Chuẩn MCP & Ranh Giới Tin Cậy
+
+- **Cơ chế truyền tải (Transport)**: Standard Input/Output (`stdio`). Server vận hành cục bộ dưới dạng tiến trình con (child process) được khởi chạy bởi client runtime (Antigravity, Claude Desktop, Cursor).
+- **Tương thích giao thức**: Hiện thực nhân JSON-RPC MCP phi trạng thái (stateless), tương thích với ngữ nghĩa **2026-07-28** (thỏa thuận phiên bản động, danh mục công cụ `server/discover`) và đồng thời tương thích ngược tuyệt đối với các client **2024-11-05**.
+- **Ranh giới tin cậy & Cô lập tiến trình**: Do server chạy qua local stdio, ranh giới an toàn và quyền truy cập file do hệ điều hành quản lý. Khi triển khai trên môi trường mạng không tin cậy (remote HTTP/SSE), bắt buộc phải có gateway xác thực, ủy quyền (authorization gateway) và mã hóa TLS độc lập phía trước.
+
 ### Cấu Hình MCP Clients
 
 Thêm vào tệp cấu hình của Claude Desktop, Antigravity, hoặc Gemini CLI:
@@ -193,7 +199,7 @@ Thêm vào tệp cấu hình của Claude Desktop, Antigravity, hoặc Gemini CL
 }
 ```
 
-Hoặc trên Windows:
+Or trên Windows:
 ```json
 {
   "mcpServers": {

@@ -21,6 +21,9 @@ pub use diff_analysis::{ComplexityDelta, ComplexitySnapshot, DiffAnalyzer, DiffR
 pub use entropy::{TextEvaluator, TextMetrics};
 pub use evidence_classifier::{EvidenceClassifier, ProvenanceLevel, SentenceEvidence};
 pub use foresight::{ForesightEngine, ForesightReport};
-pub use receipts::{EvidenceReceipt, ExecutionReceipt, ReceiptsVerificationSummary};
+pub use receipts::{
+    parse_rfc3339, validate_hex_sha256, validate_rfc3339_sequence, EvidenceReceipt, ExecutionReceipt,
+    ReceiptsVerificationSummary,
+};
 pub use research_gate::{EvidenceStatus, ResearchGate, ResearchReport};
 pub use resource_limits::*;

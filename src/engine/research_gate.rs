@@ -1,7 +1,7 @@
 use crate::engine::evidence_classifier::{
     EvidenceClassifier, ProvenanceLevel, AUTHORITATIVE_DOMAINS, KNOWN_RFC_REGISTRY, UNTRUSTED_OR_PLACEHOLDER_DOMAINS,
 };
-use crate::engine::receipts::EvidenceReceipt;
+use crate::engine::receipts::{validate_hex_sha256, EvidenceReceipt};
 use crate::engine::text_utils::{smart_split_sentences, HEDGING_PHRASES};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
@@ -298,19 +298,55 @@ impl ResearchGate {
                     if !r.is_valid_evidence() {
                         continue;
                     }
-                    let binds_claim = r
-                        .claim_binding
+                    // Structured claim_id binding check (e.g. [C1], C1:, (C1))
+                    let binds_structured_claim = r
+                        .claim_id
                         .as_ref()
-                        .map(|b| {
-                            !b.trim().is_empty()
-                                && (lower.contains(&b.to_lowercase()) || b.to_lowercase().contains(&lower))
+                        .map(|cid| {
+                            let cid_clean = cid.trim().to_lowercase();
+                            if cid_clean.is_empty() {
+                                false
+                            } else {
+                                lower.contains(&format!("[{}]", cid_clean))
+                                    || lower.contains(&format!("{}:", cid_clean))
+                                    || lower.contains(&format!("({})", cid_clean))
+                                    || lower.contains(&format!("claim {}", cid_clean))
+                            }
                         })
                         .unwrap_or(false);
-                    let mentions_source = lower.contains(&r.source_id.to_lowercase());
+
+                    // Robust semantic claim_binding check (avoiding loose substring false positives)
+                    let binds_claim = binds_structured_claim
+                        || r.claim_binding
+                            .as_ref()
+                            .map(|b| {
+                                let b_clean = b.trim().to_lowercase();
+                                if b_clean.is_empty() {
+                                    false
+                                } else if b_clean.len() >= 8 && lower.contains(&b_clean) {
+                                    true
+                                } else {
+                                    // Token boundary overlap: check if >= 3 significant words match
+                                    let b_words: Vec<&str> =
+                                        b_clean.split_whitespace().filter(|w| w.len() >= 3).collect();
+                                    if b_words.len() >= 3 {
+                                        let matches = b_words.iter().filter(|&&w| lower.contains(w)).count();
+                                        matches * 2 >= b_words.len()
+                                    } else {
+                                        false
+                                    }
+                                }
+                            })
+                            .unwrap_or(false);
+
+                    let mentions_source = !r.source_id.trim().is_empty() && lower.contains(&r.source_id.to_lowercase());
 
                     if binds_claim || mentions_source {
                         let is_valid_artifact = match r.kind.to_uppercase().as_str() {
-                            "FILE" => Path::new(&r.source_id).exists(),
+                            "FILE" => {
+                                let clean_path = r.source_id.trim();
+                                !clean_path.contains("..") && Path::new(clean_path).exists()
+                            }
                             "RFC" => {
                                 let num_str: String = r.source_id.chars().filter(|c| c.is_ascii_digit()).collect();
                                 if let Ok(num) = num_str.parse::<u32>() {
@@ -326,7 +362,9 @@ impl ResearchGate {
                                         .any(|&d| h == d || h.ends_with(&format!(".{}", d)))
                                 })
                                 .unwrap_or(false),
-                            "TEST_RUN" | "AST_REPORT" => r.sha256.is_some(),
+                            "TEST_RUN" | "AST_REPORT" => {
+                                r.sha256.as_ref().map(|h| validate_hex_sha256(h)).unwrap_or(false)
+                            }
                             _ => true,
                         };
 
@@ -432,10 +470,18 @@ impl ResearchGate {
         let factual_claims_count = claim_analyses.len();
         let citations_count = total_verified + total_unverified;
 
+        let verified_claims_count = claim_analyses.iter().filter(|c| c.is_verified).count();
+        let claim_verification_ratio = if factual_claims_count == 0 {
+            1.0
+        } else {
+            verified_claims_count as f64 / factual_claims_count as f64
+        };
+
+        // Anti-double counting: evidence_ratio bounded by fraction of claims verified
         let evidence_ratio = if factual_claims_count == 0 {
             1.0
         } else {
-            (total_verified as f64 / factual_claims_count as f64).min(2.0)
+            claim_verification_ratio
         };
 
         let speculation_ratio = speculation_count as f64 / total_sentences as f64;
@@ -448,15 +494,9 @@ impl ResearchGate {
             .collect();
         let has_research_deficit = !ungrounded_claims.is_empty();
 
-        let verified_claims_count = claim_analyses.iter().filter(|c| c.is_verified).count();
-        let claim_verification_ratio = if factual_claims_count == 0 {
-            1.0
-        } else {
-            verified_claims_count as f64 / factual_claims_count as f64
-        };
-
+        // Mathematical grounding score without arbitrary magic 95 heuristic
         let base_score = if factual_claims_count == 0 {
-            95.0
+            ((1.0 - speculation_ratio) * 100.0).clamp(0.0, 100.0)
         } else {
             (claim_verification_ratio * 70.0 + (1.0 - speculation_ratio) * 30.0).clamp(0.0, 100.0)
         };
@@ -471,7 +511,7 @@ impl ResearchGate {
 
         let verdict = if has_research_deficit {
             "RESEARCH_DEFICIT".to_string()
-        } else if total_verified > 0 || factual_claims_count == 0 {
+        } else if total_verified > 0 {
             "RESEARCH_GROUNDED".to_string()
         } else {
             "THEORETICAL".to_string()
@@ -603,6 +643,6 @@ mod tests {
         let text = "Clean code principles emphasize readability and separation of concerns.";
         let report = ResearchGate::audit(text);
         assert!(!report.has_research_deficit);
-        assert_eq!(report.verdict, "RESEARCH_GROUNDED");
+        assert_eq!(report.verdict, "THEORETICAL");
     }
 }

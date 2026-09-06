@@ -13,6 +13,12 @@ pub struct PlanTaskInput {
     pub name: String,
     #[serde(default)]
     pub dependencies: Vec<String>,
+    #[serde(default)]
+    pub capability: Option<String>,
+    #[serde(default)]
+    pub target: Option<String>,
+    #[serde(default)]
+    pub side_effect: Option<bool>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -36,6 +42,9 @@ pub struct UnifiedAuditInput {
     /// if executed_steps is empty → "plan", otherwise → "execution".
     #[serde(default)]
     pub audit_phase: Option<String>,
+    /// Optional session/audit binding identifier to prevent cross-session replay
+    #[serde(default)]
+    pub audit_id: Option<String>,
     /// Cryptographic / tool execution receipts validating executed steps
     #[serde(default)]
     pub execution_receipts: Option<Vec<ExecutionReceipt>>,
@@ -149,6 +158,12 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
     // ── Policy mode requirement check ─────────────────────────────────────────
     if let Some(ref min_mode) = input.min_policy_mode {
         let min_lower = min_mode.to_lowercase();
+        if min_lower != "standard" && min_lower != "deep" {
+            return Err(format!(
+                "Invalid min_policy_mode '{}'. Accepted values: standard, deep.",
+                min_mode
+            ));
+        }
         if (min_lower == "standard" || min_lower == "deep") && is_quick {
             return Err(format!(
                 "Policy constraint violated: caller requested mode='quick', but min_policy_mode requires '{}'",
@@ -376,7 +391,7 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
                 &mut violations,
                 &mut critical_violations,
                 &mut recommendations,
-                "CONSTRAINT_CONFLICT",
+                "REQUIREMENT_OMISSION",
                 format!(
                     "Omission Violation: {} user requirement(s) not fulfilled: {:?}",
                     rep.missing_requirements.len(),
@@ -393,7 +408,7 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
                     &mut violations,
                     &mut critical_violations,
                     &mut recommendations,
-                    "CONSTRAINT_CONFLICT",
+                    "REQUIREMENT_CONTRADICTION",
                     c.clone(),
                     ViolationSeverity::Critical,
                     "Resolve contradictory constraints between user requirements and implementation.",
@@ -648,6 +663,150 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
         let require_receipt_violations =
             input.execution_receipts.is_some() || input.audit_phase.as_deref() == Some("execution") || is_deep;
 
+        // 1. Duplicate receipt_id check within payload
+        let mut seen_receipt_ids = std::collections::HashSet::new();
+        for r in receipts {
+            if let Some(ref rid) = r.receipt_id {
+                let trimmed_rid = rid.trim();
+                if !trimmed_rid.is_empty() && !seen_receipt_ids.insert(trimmed_rid) {
+                    add_violation(
+                        &mut violations,
+                        &mut critical_violations,
+                        &mut recommendations,
+                        "DUPLICATE_RECEIPT_ID",
+                        format!(
+                            "Provenance Violation: Duplicate receipt_id '{}' detected in execution_receipts.",
+                            trimmed_rid
+                        ),
+                        ViolationSeverity::Critical,
+                        "Every execution receipt must have a unique receipt_id.",
+                    );
+                }
+            }
+        }
+
+        // 2. Anti-replay session check if audit_id is provided
+        if let Some(ref expected_audit_id) = input.audit_id {
+            let exp_trimmed = expected_audit_id.trim();
+            if !exp_trimmed.is_empty() {
+                for r in receipts {
+                    if let Some(ref r_audit) = r.audit_id {
+                        if r_audit.trim() != exp_trimmed {
+                            add_violation(
+                                &mut violations,
+                                &mut critical_violations,
+                                &mut recommendations,
+                                "RECEIPT_REPLAY_DETECTED",
+                                format!(
+                                    "Provenance Violation: Execution receipt '{}' bound to audit_id '{}' does not match current session '{}'.",
+                                    r.receipt_id.as_deref().unwrap_or("unknown"),
+                                    r_audit.trim(),
+                                    exp_trimmed
+                                ),
+                                ViolationSeverity::Critical,
+                                "Do not replay receipts from different audit sessions.",
+                            );
+                        }
+                    } else if is_deep {
+                        add_violation(
+                            &mut violations,
+                            &mut critical_violations,
+                            &mut recommendations,
+                            "RECEIPT_REPLAY_DETECTED",
+                            format!(
+                                "Deep Governance Violation: Execution receipt '{}' lacks required audit_id binding for session '{}'.",
+                                r.receipt_id.as_deref().unwrap_or("unknown"),
+                                exp_trimmed
+                            ),
+                            ViolationSeverity::Critical,
+                            "Bind execution receipts to current audit_id in deep governance mode.",
+                        );
+                    }
+                }
+            }
+        }
+
+        // 3. Action-to-Tool / Capability matching
+        for step in &input.executed_steps {
+            if let Some(task) = input.planned_tasks.iter().find(|t| t.id == *step) {
+                let matching: Vec<&ExecutionReceipt> = receipts.iter().filter(|r| r.action_id == *step).collect();
+                for r in matching {
+                    if let Some(ref cap) = task.capability {
+                        let cap_clean = cap.trim().to_lowercase();
+                        let tool_clean = r.tool_name.trim().to_lowercase();
+                        let is_compatible = if cap_clean.starts_with("test") {
+                            tool_clean.contains("test")
+                                || tool_clean.contains("cargo")
+                                || tool_clean.contains("eval")
+                                || tool_clean.contains("run")
+                                || tool_clean.contains("pytest")
+                                || tool_clean.contains("jest")
+                        } else if cap_clean.starts_with("build") || cap_clean.starts_with("compile") {
+                            tool_clean.contains("build")
+                                || tool_clean.contains("compile")
+                                || tool_clean.contains("cargo")
+                                || tool_clean.contains("tsc")
+                                || tool_clean.contains("make")
+                        } else if cap_clean.starts_with("file") || cap_clean.starts_with("fs") {
+                            tool_clean.contains("file")
+                                || tool_clean.contains("write")
+                                || tool_clean.contains("edit")
+                                || tool_clean.contains("read")
+                                || tool_clean.contains("patch")
+                                || tool_clean.contains("cargo")
+                                || tool_clean.contains("git")
+                        } else if cap_clean.starts_with("network") || cap_clean.starts_with("http") {
+                            tool_clean.contains("curl")
+                                || tool_clean.contains("fetch")
+                                || tool_clean.contains("http")
+                                || tool_clean.contains("net")
+                        } else {
+                            tool_clean.contains(&cap_clean) || cap_clean.contains(&tool_clean)
+                        };
+
+                        if !is_compatible {
+                            add_violation(
+                                &mut violations,
+                                &mut critical_violations,
+                                &mut recommendations,
+                                "ACTION_TOOL_MISMATCH",
+                                format!(
+                                    "Capability Mismatch: Planned task '{}' declares capability '{}', but execution receipt used incompatible tool '{}'.",
+                                    step, cap, r.tool_name
+                                ),
+                                ViolationSeverity::Critical,
+                                "Ensure executed tool aligns with the declared task capability.",
+                            );
+                        }
+                    } else {
+                        // Fallback: check task name for obvious test action with unrelated tool
+                        let task_lower = task.name.to_lowercase();
+                        let tool_lower = r.tool_name.to_lowercase();
+                        if (task_lower.contains("test") || task_lower.contains("kiểm thử"))
+                            && (tool_lower == "curl"
+                                || tool_lower == "rm"
+                                || tool_lower == "delete"
+                                || tool_lower == "ping")
+                        {
+                            add_violation(
+                                &mut violations,
+                                &mut critical_violations,
+                                &mut recommendations,
+                                "ACTION_TOOL_MISMATCH",
+                                format!(
+                                    "Action-Tool Mismatch: Planned test task '{}' was executed with incompatible tool '{}'.",
+                                    step, r.tool_name
+                                ),
+                                ViolationSeverity::Critical,
+                                "Execute test tasks with test runners or compilers, not unrelated tools.",
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
+        // 4. Verification of matching steps and exit codes
         for step in &input.executed_steps {
             let matching: Vec<&ExecutionReceipt> = receipts.iter().filter(|r| r.action_id == *step).collect();
             if matching.is_empty() {
@@ -716,7 +875,7 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
                         Some(_) => {}
                     }
 
-                    // Check machine-verifiability (arguments_hash & result_hash must be present and non-empty)
+                    // Check machine-verifiability (arguments_hash, result_hash must be valid 64-hex, receipt_id non-empty, timestamps valid)
                     if !r.is_machine_verifiable() {
                         unverifiable_count += 1;
                         add_violation(
@@ -725,11 +884,11 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
                             &mut recommendations,
                             "UNVERIFIABLE_RECEIPT",
                             format!(
-                                "Execution Receipt for '{}' lacks required cryptographic hashes (arguments_hash or result_hash missing).",
+                                "Execution Receipt for '{}' lacks required machine-verifiable cryptographic fields (valid 64-hex SHA-256 arguments_hash and result_hash, non-empty receipt_id, valid timestamps).",
                                 step
                             ),
                             if is_deep { ViolationSeverity::Critical } else { ViolationSeverity::Warning },
-                            "Provide non-empty arguments_hash and result_hash in ExecutionReceipt.",
+                            "Provide valid receipt_id, 64-hex arguments_hash, and result_hash in ExecutionReceipt.",
                         );
                     } else if r.exit_code == Some(0) {
                         matched_count += 1;
@@ -982,7 +1141,7 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
                     &mut recommendations,
                     "MAINTAINABILITY_DEFICIT",
                     format!(
-                        "Low Maintainability Index MI={:.1}: Code is hard to maintain and prone to bugs",
+                        "Low Maintainability Index MI={:.1}: Code has lower maintainability according to this heuristic",
                         rep.maintainability_index
                     ),
                     ViolationSeverity::Warning,
@@ -1088,8 +1247,11 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
         info: info_count,
     };
 
-    // Policy score is determined strictly by deterministic invariant compliance
-    let policy_score = if critical_count > 0 || !has_any_input || !mandatory_contract_met {
+    let policy_score = if critical_count > 0
+        || !has_any_input
+        || !mandatory_contract_met
+        || (input.audit_phase.as_deref() == Some("execution") && input.executed_steps.is_empty())
+    {
         0.0
     } else if warning_count > 0 {
         (diagnostic_score * 0.8).min(74.0)
@@ -1099,22 +1261,25 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
 
     let composite_score = (policy_score * 0.7) + (diagnostic_score * 0.3);
 
-    let (decision, verdict) = if critical_count > 0 {
-        ("BLOCK".to_string(), "FAIL".to_string())
-    } else if !has_any_input || weighted_scores.is_empty() || !mandatory_contract_met {
-        ("INSUFFICIENT_EVIDENCE".to_string(), "UNVERIFIED".to_string())
-    } else if policy_score < 50.0 {
-        ("BLOCK".to_string(), "FAIL".to_string())
-    } else if warning_count > 0 || policy_score < 75.0 {
-        ("WARN".to_string(), "WARN".to_string())
-    } else if is_plan_phase {
-        ("ALLOW".to_string(), "PLAN_APPROVED".to_string())
-    } else if is_quick {
-        // QUICK MODE CAN NEVER AUTHORIZE DELIVERY
-        ("CHECKPOINT_PASS".to_string(), "QUICK_PASS".to_string())
-    } else {
-        ("ALLOW".to_string(), "PASS".to_string())
-    };
+    let (decision, verdict) =
+        if input.audit_phase.as_deref() == Some("execution") && input.executed_steps.is_empty() && !is_deep {
+            ("INSUFFICIENT_EVIDENCE".to_string(), "UNVERIFIED".to_string())
+        } else if critical_count > 0 {
+            ("BLOCK".to_string(), "FAIL".to_string())
+        } else if !has_any_input || weighted_scores.is_empty() || !mandatory_contract_met {
+            ("INSUFFICIENT_EVIDENCE".to_string(), "UNVERIFIED".to_string())
+        } else if policy_score < 50.0 {
+            ("BLOCK".to_string(), "FAIL".to_string())
+        } else if warning_count > 0 || policy_score < 75.0 {
+            ("WARN".to_string(), "WARN".to_string())
+        } else if is_plan_phase {
+            ("ALLOW".to_string(), "PLAN_APPROVED".to_string())
+        } else if is_quick {
+            // QUICK MODE CAN NEVER AUTHORIZE DELIVERY
+            ("CHECKPOINT_PASS".to_string(), "QUICK_PASS".to_string())
+        } else {
+            ("ALLOW".to_string(), "PASS".to_string())
+        };
 
     let has_full_receipt_provenance = if is_plan_phase {
         true
@@ -1320,7 +1485,7 @@ mod tests {
                     "exit_code": 0
                 }
             ],
-            "draft_response": "According to docs.rs and RFC 1234, implementation is complete. See: https://docs.rs/example",
+            "draft_response": "According to docs.rs and RFC 2119, implementation is complete. See: https://docs.rs/example",
             "code_snippet": "fn feature() -> bool { true }",
             "language": "rust"
         });
