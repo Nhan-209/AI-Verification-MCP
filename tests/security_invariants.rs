@@ -679,7 +679,8 @@ fn test_diagnostic_tools_report_non_authoritative() {
     let dag_res = execute_plan_tracker(json!({
         "tasks": [{"id": "t1", "name": "step 1", "dependencies": []}],
         "executed_steps": ["t1"]
-    })).expect("plan tracker must succeed");
+    }))
+    .expect("plan tracker must succeed");
     assert_eq!(dag_res["result_type"], "DIAGNOSTIC");
     assert_eq!(dag_res["authoritative"], false);
 
@@ -687,21 +688,24 @@ fn test_diagnostic_tools_report_non_authoritative() {
     let code_res = execute_code_evaluator(json!({
         "code": "fn test() -> bool { true }",
         "language": "rust"
-    })).expect("code evaluator must succeed");
+    }))
+    .expect("code evaluator must succeed");
     assert_eq!(code_res["result_type"], "DIAGNOSTIC");
     assert_eq!(code_res["authoritative"], false);
 
     // 3. verify_text
     let text_res = execute_text_evaluator(json!({
         "text": "Information theory provides mathematical definitions for entropy."
-    })).expect("text evaluator must succeed");
+    }))
+    .expect("text evaluator must succeed");
     assert_eq!(text_res["result_type"], "DIAGNOSTIC");
     assert_eq!(text_res["authoritative"], false);
 
     // 4. verify_confidence
     let conf_res = execute_confidence_checker(json!({
         "text": "The library is available at https://crates.io with test coverage."
-    })).expect("confidence checker must succeed");
+    }))
+    .expect("confidence checker must succeed");
     assert_eq!(conf_res["result_type"], "DIAGNOSTIC");
     assert_eq!(conf_res["authoritative"], false);
 
@@ -710,7 +714,8 @@ fn test_diagnostic_tools_report_non_authoritative() {
         "before_code": "let a = 1;",
         "after_code": "let a = 2;",
         "language": "rust"
-    })).expect("diff checker must succeed");
+    }))
+    .expect("diff checker must succeed");
     assert_eq!(diff_res["result_type"], "DIAGNOSTIC");
     assert_eq!(diff_res["authoritative"], false);
 
@@ -719,14 +724,16 @@ fn test_diagnostic_tools_report_non_authoritative() {
         "text": "Includes fallback error recovery and edge cases.",
         "requirements_count": 2,
         "planned_tasks_count": 2
-    })).expect("foresight checker must succeed");
+    }))
+    .expect("foresight checker must succeed");
     assert_eq!(fore_res["result_type"], "DIAGNOSTIC");
     assert_eq!(fore_res["authoritative"], false);
 
     // 7. verify_research
     let res_res = execute_research_checker(json!({
         "text": "According to RFC 2119, MUST indicates requirement."
-    })).expect("research checker must succeed");
+    }))
+    .expect("research checker must succeed");
     assert_eq!(res_res["result_type"], "DIAGNOSTIC");
     assert_eq!(res_res["authoritative"], false);
 
@@ -734,7 +741,8 @@ fn test_diagnostic_tools_report_non_authoritative() {
     let cons_res = execute_constraint_checker(json!({
         "requirements": ["must support async"],
         "implementations": ["fully supports async processing"]
-    })).expect("constraint checker must succeed");
+    }))
+    .expect("constraint checker must succeed");
     assert_eq!(cons_res["result_type"], "DIAGNOSTIC");
     assert_eq!(cons_res["authoritative"], false);
 }
