@@ -324,7 +324,9 @@ fn test_omission_vs_contradiction_distinct_codes() {
     let res_omission = execute_unified_audit(payload_omission).expect("omission audit");
     let violations_omission = res_omission["violations"].as_array().unwrap();
     assert!(violations_omission.iter().any(|v| v["code"] == "REQUIREMENT_OMISSION"));
-    assert!(!violations_omission.iter().any(|v| v["code"] == "REQUIREMENT_CONTRADICTION"));
+    assert!(!violations_omission
+        .iter()
+        .any(|v| v["code"] == "REQUIREMENT_CONTRADICTION"));
 
     // 2. Contradiction scenario
     let payload_contradiction = json!({
@@ -337,12 +339,18 @@ fn test_omission_vs_contradiction_distinct_codes() {
     });
     let res_contradiction = execute_unified_audit(payload_contradiction).expect("contradiction audit");
     let violations_contradiction = res_contradiction["violations"].as_array().unwrap();
-    assert!(violations_contradiction.iter().any(|v| v["code"] == "REQUIREMENT_CONTRADICTION"));
+    assert!(violations_contradiction
+        .iter()
+        .any(|v| v["code"] == "REQUIREMENT_CONTRADICTION"));
 }
 
 #[test]
 fn test_validate_hex_sha256_function() {
-    assert!(validate_hex_sha256("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"));
+    assert!(validate_hex_sha256(
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    ));
     assert!(!validate_hex_sha256("123456"));
-    assert!(!validate_hex_sha256("e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b85Z")); // Z is not hex
+    assert!(!validate_hex_sha256(
+        "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b85Z"
+    )); // Z is not hex
 }

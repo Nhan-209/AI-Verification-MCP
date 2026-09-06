@@ -72,12 +72,9 @@ pub fn parse_rfc3339(s: &str) -> Option<f64> {
     }
 
     let days = days_from_civil(year, month, day);
-    let total_sec = (days as f64 * 86400.0)
-        + (hour as f64 * 3600.0)
-        + (minute as f64 * 60.0)
-        + second as f64
-        + fraction
-        - tz_offset_sec;
+    let total_sec =
+        (days as f64 * 86400.0) + (hour as f64 * 3600.0) + (minute as f64 * 60.0) + second as f64 + fraction
+            - tz_offset_sec;
 
     Some(total_sec)
 }
@@ -300,7 +297,10 @@ mod tests {
             Some("2026-09-06T14:05:00Z"),
             Some("2026-09-06T14:00:00Z")
         ));
-        assert!(!validate_rfc3339_sequence(Some("invalid"), Some("2026-09-06T14:00:00Z")));
+        assert!(!validate_rfc3339_sequence(
+            Some("invalid"),
+            Some("2026-09-06T14:00:00Z")
+        ));
     }
 
     #[test]

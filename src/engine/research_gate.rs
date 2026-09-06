@@ -339,8 +339,7 @@ impl ResearchGate {
                             })
                             .unwrap_or(false);
 
-                    let mentions_source =
-                        !r.source_id.trim().is_empty() && lower.contains(&r.source_id.to_lowercase());
+                    let mentions_source = !r.source_id.trim().is_empty() && lower.contains(&r.source_id.to_lowercase());
 
                     if binds_claim || mentions_source {
                         let is_valid_artifact = match r.kind.to_uppercase().as_str() {
