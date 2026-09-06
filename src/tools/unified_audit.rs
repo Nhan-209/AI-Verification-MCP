@@ -1261,30 +1261,25 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
 
     let composite_score = (policy_score * 0.7) + (diagnostic_score * 0.3);
 
-    let (decision, verdict) = if input.audit_phase.as_deref() == Some("execution")
-        && input.executed_steps.is_empty()
-        && !is_deep
-    {
-        ("INSUFFICIENT_EVIDENCE".to_string(), "UNVERIFIED".to_string())
-    } else if critical_count > 0 {
-        ("BLOCK".to_string(), "FAIL".to_string())
-    } else if !has_any_input
-        || weighted_scores.is_empty()
-        || !mandatory_contract_met
-    {
-        ("INSUFFICIENT_EVIDENCE".to_string(), "UNVERIFIED".to_string())
-    } else if policy_score < 50.0 {
-        ("BLOCK".to_string(), "FAIL".to_string())
-    } else if warning_count > 0 || policy_score < 75.0 {
-        ("WARN".to_string(), "WARN".to_string())
-    } else if is_plan_phase {
-        ("ALLOW".to_string(), "PLAN_APPROVED".to_string())
-    } else if is_quick {
-        // QUICK MODE CAN NEVER AUTHORIZE DELIVERY
-        ("CHECKPOINT_PASS".to_string(), "QUICK_PASS".to_string())
-    } else {
-        ("ALLOW".to_string(), "PASS".to_string())
-    };
+    let (decision, verdict) =
+        if input.audit_phase.as_deref() == Some("execution") && input.executed_steps.is_empty() && !is_deep {
+            ("INSUFFICIENT_EVIDENCE".to_string(), "UNVERIFIED".to_string())
+        } else if critical_count > 0 {
+            ("BLOCK".to_string(), "FAIL".to_string())
+        } else if !has_any_input || weighted_scores.is_empty() || !mandatory_contract_met {
+            ("INSUFFICIENT_EVIDENCE".to_string(), "UNVERIFIED".to_string())
+        } else if policy_score < 50.0 {
+            ("BLOCK".to_string(), "FAIL".to_string())
+        } else if warning_count > 0 || policy_score < 75.0 {
+            ("WARN".to_string(), "WARN".to_string())
+        } else if is_plan_phase {
+            ("ALLOW".to_string(), "PLAN_APPROVED".to_string())
+        } else if is_quick {
+            // QUICK MODE CAN NEVER AUTHORIZE DELIVERY
+            ("CHECKPOINT_PASS".to_string(), "QUICK_PASS".to_string())
+        } else {
+            ("ALLOW".to_string(), "PASS".to_string())
+        };
 
     let has_full_receipt_provenance = if is_plan_phase {
         true
