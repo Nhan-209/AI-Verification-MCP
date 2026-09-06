@@ -1260,9 +1260,11 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
 
     let (decision, verdict) = if critical_count > 0 {
         ("BLOCK".to_string(), "FAIL".to_string())
-    } else if !has_any_input || weighted_scores.is_empty() || !mandatory_contract_met {
-        ("INSUFFICIENT_EVIDENCE".to_string(), "UNVERIFIED".to_string())
-    } else if input.audit_phase.as_deref() == Some("execution") && input.executed_steps.is_empty() {
+    } else if !has_any_input
+        || weighted_scores.is_empty()
+        || !mandatory_contract_met
+        || (input.audit_phase.as_deref() == Some("execution") && input.executed_steps.is_empty())
+    {
         ("INSUFFICIENT_EVIDENCE".to_string(), "UNVERIFIED".to_string())
     } else if policy_score < 50.0 {
         ("BLOCK".to_string(), "FAIL".to_string())

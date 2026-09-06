@@ -50,30 +50,31 @@ pub fn parse_rfc3339(s: &str) -> Option<f64> {
         rem = &rem[frac_end..];
     }
 
-    let mut tz_offset_sec = 0.0;
-    let rem_trim = rem.trim();
-    if rem_trim.is_empty() || rem_trim.eq_ignore_ascii_case("Z") {
-        tz_offset_sec = 0.0;
-    } else if rem_trim.starts_with('+') || rem_trim.starts_with('-') {
-        let sign = if rem_trim.starts_with('+') { 1.0 } else { -1.0 };
-        let tz_body = &rem_trim[1..];
-        let parts: Vec<&str> = tz_body.split(':').collect();
-        if parts.is_empty() {
-            return None;
-        }
-        let tz_h = parts[0].parse::<u32>().ok()?;
-        let tz_m = if parts.len() > 1 {
-            parts[1].parse::<u32>().ok()?
+    let tz_offset_sec = {
+        let rem_trim = rem.trim();
+        if rem_trim.is_empty() || rem_trim.eq_ignore_ascii_case("Z") {
+            0.0
+        } else if rem_trim.starts_with('+') || rem_trim.starts_with('-') {
+            let sign = if rem_trim.starts_with('+') { 1.0 } else { -1.0 };
+            let tz_body = &rem_trim[1..];
+            let parts: Vec<&str> = tz_body.split(':').collect();
+            if parts.is_empty() {
+                return None;
+            }
+            let tz_h = parts[0].parse::<u32>().ok()?;
+            let tz_m = if parts.len() > 1 {
+                parts[1].parse::<u32>().ok()?
+            } else {
+                0
+            };
+            if tz_h > 23 || tz_m > 59 {
+                return None;
+            }
+            sign * (tz_h as f64 * 3600.0 + tz_m as f64 * 60.0)
         } else {
-            0
-        };
-        if tz_h > 23 || tz_m > 59 {
             return None;
         }
-        tz_offset_sec = sign * (tz_h as f64 * 3600.0 + tz_m as f64 * 60.0);
-    } else {
-        return None;
-    }
+    };
 
     let days = days_from_civil(year, month, day);
     let total_sec =
