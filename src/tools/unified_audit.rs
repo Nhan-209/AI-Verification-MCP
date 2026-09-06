@@ -645,33 +645,39 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
         let mut unverifiable_count = 0;
         let mut unattested_steps = Vec::new();
 
+        let require_receipt_violations = input.execution_receipts.is_some()
+            || input.audit_phase.as_deref() == Some("execution")
+            || is_deep;
+
         for step in &input.executed_steps {
             let matching: Vec<&ExecutionReceipt> = receipts.iter().filter(|r| r.action_id == *step).collect();
             if matching.is_empty() {
                 unattested_steps.push(step.clone());
-                if is_deep {
-                    add_violation(
-                        &mut violations,
-                        &mut critical_violations,
-                        &mut recommendations,
-                        "UNATTESTED_EXECUTION_CLAIM",
-                        format!(
-                            "Deep Mode Invariant: Executed step '{}' has no cryptographic/machine-verifiable execution receipt.",
-                            step
-                        ),
-                        ViolationSeverity::Critical,
-                        "Provide an ExecutionReceipt with tool output hash and return code for every executed step.",
-                    );
-                } else {
-                    add_violation(
-                        &mut violations,
-                        &mut critical_violations,
-                        &mut recommendations,
-                        "UNATTESTED_EXECUTION_CLAIM",
-                        format!("Executed step '{}' is missing execution receipt verification.", step),
-                        ViolationSeverity::Warning,
-                        "Provide ExecutionReceipts to verify execution integrity before delivery.",
-                    );
+                if require_receipt_violations {
+                    if is_deep {
+                        add_violation(
+                            &mut violations,
+                            &mut critical_violations,
+                            &mut recommendations,
+                            "UNATTESTED_EXECUTION_CLAIM",
+                            format!(
+                                "Deep Mode Invariant: Executed step '{}' has no cryptographic/machine-verifiable execution receipt.",
+                                step
+                            ),
+                            ViolationSeverity::Critical,
+                            "Provide an ExecutionReceipt with tool output hash and return code for every executed step.",
+                        );
+                    } else {
+                        add_violation(
+                            &mut violations,
+                            &mut critical_violations,
+                            &mut recommendations,
+                            "UNATTESTED_EXECUTION_CLAIM",
+                            format!("Executed step '{}' is missing execution receipt verification.", step),
+                            ViolationSeverity::Warning,
+                            "Provide ExecutionReceipts to verify execution integrity before delivery.",
+                        );
+                    }
                 }
             } else {
                 for r in matching {
