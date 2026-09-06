@@ -62,7 +62,11 @@ pub fn parse_rfc3339(s: &str) -> Option<f64> {
             return None;
         }
         let tz_h = parts[0].parse::<u32>().ok()?;
-        let tz_m = if parts.len() > 1 { parts[1].parse::<u32>().ok()? } else { 0 };
+        let tz_m = if parts.len() > 1 {
+            parts[1].parse::<u32>().ok()?
+        } else {
+            0
+        };
         if tz_h > 23 || tz_m > 59 {
             return None;
         }
