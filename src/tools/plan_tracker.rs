@@ -1,3 +1,4 @@
+use crate::engine::resource_limits::{MAX_EXECUTED_STEPS, MAX_TASKS};
 use crate::engine::PlanDag;
 use crate::tools::unified_audit::PlanTaskInput;
 use serde::Deserialize;
@@ -13,6 +14,21 @@ pub struct PlanTrackerInput {
 pub fn execute_plan_tracker(args: Value) -> Result<Value, String> {
     let input: PlanTrackerInput =
         serde_json::from_value(args).map_err(|e| format!("Invalid arguments for math_track_dag: {}", e))?;
+
+    if input.tasks.len() > MAX_TASKS {
+        return Err(format!(
+            "Resource limit exceeded: tasks count {} > MAX_TASKS {}",
+            input.tasks.len(),
+            MAX_TASKS
+        ));
+    }
+    if input.executed_steps.len() > MAX_EXECUTED_STEPS {
+        return Err(format!(
+            "Resource limit exceeded: executed_steps count {} > MAX_EXECUTED_STEPS {}",
+            input.executed_steps.len(),
+            MAX_EXECUTED_STEPS
+        ));
+    }
 
     let mut dag = PlanDag::new();
     for t in input.tasks {

@@ -1,3 +1,4 @@
+use crate::engine::resource_limits::MAX_REQUIREMENTS;
 use crate::engine::ConstraintEngine;
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -11,6 +12,21 @@ pub struct ConstraintCheckerInput {
 pub fn execute_constraint_checker(args: Value) -> Result<Value, String> {
     let input: ConstraintCheckerInput =
         serde_json::from_value(args).map_err(|e| format!("Invalid arguments for math_verify_constraints: {}", e))?;
+
+    if input.requirements.len() > MAX_REQUIREMENTS {
+        return Err(format!(
+            "Resource limit exceeded: requirements count {} > MAX_REQUIREMENTS {}",
+            input.requirements.len(),
+            MAX_REQUIREMENTS
+        ));
+    }
+    if input.implementations.len() > MAX_REQUIREMENTS {
+        return Err(format!(
+            "Resource limit exceeded: implementations count {} > MAX_REQUIREMENTS {}",
+            input.implementations.len(),
+            MAX_REQUIREMENTS
+        ));
+    }
 
     let report = ConstraintEngine::verify(&input.requirements, &input.implementations);
     Ok(json!(report))

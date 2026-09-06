@@ -1,3 +1,4 @@
+use crate::engine::resource_limits::{validate_text_bound, MAX_TEXT_BYTES};
 use crate::engine::ConfidenceAnalyzer;
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -15,6 +16,8 @@ pub struct ConfidenceCheckerInput {
 pub fn execute_confidence_checker(args: Value) -> Result<Value, String> {
     let input: ConfidenceCheckerInput =
         serde_json::from_value(args).map_err(|e| format!("Invalid arguments for math_confidence: {}", e))?;
+
+    validate_text_bound(&input.text, "text", MAX_TEXT_BYTES)?;
 
     let report = ConfidenceAnalyzer::analyze(&input.text);
 

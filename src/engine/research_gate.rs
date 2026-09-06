@@ -1,5 +1,6 @@
-//! Research Gate Engine: Forces AI to cite empirical evidence and verify claims before delivering output.
-
+use crate::engine::evidence_classifier::{
+    EvidenceClassifier, ProvenanceLevel, AUTHORITATIVE_DOMAINS, KNOWN_RFC_REGISTRY, UNTRUSTED_OR_PLACEHOLDER_DOMAINS,
+};
 use crate::engine::text_utils::{smart_split_sentences, HEDGING_PHRASES};
 use serde::{Deserialize, Serialize};
 use std::path::Path;
@@ -57,42 +58,6 @@ pub struct ResearchReport {
     /// Actionable research recommendations
     pub recommendations: Vec<String>,
 }
-
-const AUTHORITATIVE_DOMAINS: &[&str] = &[
-    "docs.rs",
-    "crates.io",
-    "github.com",
-    "ietf.org",
-    "w3.org",
-    "developer.mozilla.org",
-    "python.org",
-    "go.dev",
-    "pkg.go.dev",
-    "kernel.org",
-    "iso.org",
-    "ieee.org",
-    "rust-lang.org",
-    "npmjs.com",
-    "pypi.org",
-];
-
-const UNTRUSTED_OR_PLACEHOLDER_DOMAINS: &[&str] = &[
-    "example.com",
-    "example.org",
-    "example.net",
-    "fake.example",
-    "test.com",
-    "foo.bar",
-    "localhost",
-];
-
-/// Curated registry of recognized, published IETF standard RFCs.
-pub const KNOWN_RFC_REGISTRY: &[u32] = &[
-    768, 791, 792, 793, 826, 854, 959, 1034, 1035, 1122, 1123, 1234, 1918, 2024, 2045, 2046, 2119, 2131, 2326, 2616,
-    2818, 2821, 2822, 3261, 3339, 3492, 3550, 3986, 4122, 4251, 4252, 4253, 4254, 4346, 4648, 5246, 5280, 5321, 5322,
-    5869, 6066, 6265, 6455, 6749, 6750, 7230, 7231, 7232, 7233, 7234, 7235, 7515, 7519, 7540, 7636, 8174, 8259, 8446,
-    9000, 9001, 9110, 9111, 9112, 9113, 9114, 9204, 9218, 9293, 9440,
-];
 
 pub struct ResearchGate;
 

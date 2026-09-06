@@ -1,3 +1,4 @@
+use crate::engine::resource_limits::{validate_text_bound, MAX_TEXT_BYTES};
 use crate::engine::ResearchGate;
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -10,6 +11,9 @@ pub struct ResearchCheckerInput {
 pub fn execute_research_checker(args: Value) -> Result<Value, String> {
     let input: ResearchCheckerInput =
         serde_json::from_value(args).map_err(|e| format!("Invalid arguments for math_audit_research: {}", e))?;
+
+    validate_text_bound(&input.text, "text", MAX_TEXT_BYTES)?;
+
     let report = ResearchGate::audit(&input.text);
     Ok(json!(report))
 }

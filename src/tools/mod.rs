@@ -74,6 +74,45 @@ pub fn get_available_tools() -> Vec<Tool> {
                     "language": {
                         "type": "string",
                         "description": "Programming language (rust, typescript, javascript, python, go, java, c, cpp, etc.)"
+                    },
+                    "audit_phase": {
+                        "type": "string",
+                        "enum": ["plan", "execution"],
+                        "description": "Audit phase: 'plan' (validates plan structure, delivery not authorized) or 'execution' (validates execution and receipts)"
+                    },
+                    "execution_receipts": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "action_id": { "type": "string" },
+                                "tool_name": { "type": "string" },
+                                "arguments_hash": { "type": "string" },
+                                "result_hash": { "type": "string" },
+                                "exit_code": { "type": "integer" },
+                                "workspace_revision": { "type": "string" }
+                            },
+                            "required": ["action_id", "tool_name"]
+                        },
+                        "description": "Machine-verifiable tool execution receipts for provenance verification"
+                    },
+                    "evidence_receipts": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "kind": { "type": "string" },
+                                "source_id": { "type": "string" },
+                                "sha256": { "type": "string" }
+                            },
+                            "required": ["kind", "source_id"]
+                        },
+                        "description": "Cryptographic evidence artifact receipts"
+                    },
+                    "min_policy_mode": {
+                        "type": "string",
+                        "enum": ["standard", "deep"],
+                        "description": "Minimum enforcement policy mode required by system contract"
                     }
                 }
             }),

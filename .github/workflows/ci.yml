@@ -13,32 +13,21 @@ jobs:
   fmt:
     name: Format Check
     runs-on: ubuntu-latest
-    # Only run on PRs; on push to main, files are already formatted.
     permissions:
-      contents: write
+      contents: read
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           ref: ${{ github.head_ref || github.ref_name }}
-          token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Install Rust Toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt
 
-      - name: Format and commit if needed
-        run: |
-          cargo fmt --all
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          if ! git diff --quiet -- '*.rs'; then
-            git commit -am "chore(fmt): auto-format Rust source [skip ci]"
-            git push
-          else
-            echo "All files already formatted."
-          fi
+      - name: Check Rust Formatting
+        run: cargo fmt --all -- --check
 
   check-and-test:
     name: Check, Test & Build (${{ matrix.os }})

@@ -444,3 +444,108 @@ fn invariant_execution_phase_authorizes_delivery_on_allow() {
         "is_delivery_authorized must be true for passing execution phase"
     );
 }
+
+// ─── Invariant: Quick mode NEVER authorises delivery ─────────────────────────
+
+#[test]
+fn invariant_quick_mode_never_authorizes_delivery() {
+    let res = execute_unified_audit(json!({
+        "mode": "quick",
+        "user_requirements": ["speedy verification"],
+        "planned_tasks": [{"id": "t1", "name": "speedy verification", "dependencies": []}],
+        "executed_steps": ["t1"],
+        "draft_response": "Grounded per https://docs.rs/serde and RFC 2119."
+    }))
+    .expect("audit must evaluate");
+
+    assert_eq!(res["decision"].as_str().unwrap(), "CHECKPOINT_PASS");
+    assert_eq!(res["verdict"].as_str().unwrap(), "QUICK_PASS");
+    assert!(
+        !res["is_delivery_authorized"].as_bool().unwrap(),
+        "Quick mode must never authorize delivery: is_delivery_authorized must be false"
+    );
+}
+
+// ─── Invariant: min_policy_mode rejects quick mode bypass ────────────────────
+
+#[test]
+fn invariant_min_policy_mode_blocks_quick_bypass() {
+    let res = execute_unified_audit(json!({
+        "mode": "quick",
+        "min_policy_mode": "standard",
+        "user_requirements": ["implement secure protocol"]
+    }));
+    assert!(
+        res.is_err(),
+        "min_policy_mode='standard' must reject mode='quick' requests"
+    );
+    assert!(res.unwrap_err().contains("Policy constraint violated"));
+}
+
+// ─── Invariant: Unapproved mutating action produces Critical BLOCK ───────────
+
+#[test]
+fn invariant_unapproved_mutation_triggers_critical_block() {
+    let res = execute_unified_audit(json!({
+        "user_requirements": ["test feature"],
+        "planned_tasks": [{"id": "t1", "name": "test feature", "dependencies": []}],
+        "executed_steps": ["t1", "send_credentials_to_test"],
+        "draft_response": "Implementation completed per https://docs.rs/serde."
+    }))
+    .expect("audit must evaluate");
+
+    assert_eq!(
+        res["decision"].as_str().unwrap(),
+        "BLOCK",
+        "Composite action with mutation verb 'send' outside plan DAG must BLOCK"
+    );
+    let violations = res["violations"].as_array().unwrap();
+    assert!(
+        violations
+            .iter()
+            .any(|v| v["code"] == "UNAPPROVED_MUTATION_SCOPE_CREEP"),
+        "Must raise UNAPPROVED_MUTATION_SCOPE_CREEP"
+    );
+}
+
+// ─── Invariant: Execution Receipts Verification ──────────────────────────────
+
+#[test]
+fn invariant_execution_receipts_verified_and_failures_block() {
+    // Failing exit code must trigger BLOCK
+    let res_fail = execute_unified_audit(json!({
+        "user_requirements": ["compile project"],
+        "planned_tasks": [{"id": "t1", "name": "compile project", "dependencies": []}],
+        "executed_steps": ["t1"],
+        "execution_receipts": [
+            {
+                "action_id": "t1",
+                "tool_name": "cargo_test",
+                "exit_code": 1
+            }
+        ],
+        "draft_response": "Compilation done per https://docs.rs/example."
+    }))
+    .expect("audit must evaluate");
+
+    assert_eq!(res_fail["decision"].as_str().unwrap(), "BLOCK");
+    let violations = res_fail["violations"].as_array().unwrap();
+    assert!(violations.iter().any(|v| v["code"] == "FAILED_EXECUTION_RECEIPT"));
+
+    // Deep mode missing receipt triggers Critical UNATTESTED_EXECUTION_CLAIM
+    let res_missing_deep = execute_unified_audit(json!({
+        "mode": "deep",
+        "user_requirements": ["compile project"],
+        "planned_tasks": [{"id": "t1", "name": "compile project", "dependencies": []}],
+        "executed_steps": ["t1"],
+        "execution_receipts": [],
+        "draft_response": "Compilation done per https://docs.rs/example."
+    }))
+    .expect("audit must evaluate");
+
+    assert_eq!(res_missing_deep["decision"].as_str().unwrap(), "BLOCK");
+    let violations_deep = res_missing_deep["violations"].as_array().unwrap();
+    assert!(violations_deep
+        .iter()
+        .any(|v| v["code"] == "UNATTESTED_EXECUTION_CLAIM"));
+}
