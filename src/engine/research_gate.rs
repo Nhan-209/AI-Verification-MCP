@@ -1,6 +1,5 @@
 use crate::engine::evidence_classifier::{
-    EvidenceClassifier, ProvenanceLevel, AUTHORITATIVE_DOMAINS, KNOWN_RFC_REGISTRY,
-    UNTRUSTED_OR_PLACEHOLDER_DOMAINS,
+    EvidenceClassifier, ProvenanceLevel, AUTHORITATIVE_DOMAINS, KNOWN_RFC_REGISTRY, UNTRUSTED_OR_PLACEHOLDER_DOMAINS,
 };
 use crate::engine::text_utils::{smart_split_sentences, HEDGING_PHRASES};
 use serde::{Deserialize, Serialize};

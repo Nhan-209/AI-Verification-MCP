@@ -1,5 +1,5 @@
-use crate::engine::CodeAnalyzer;
 use crate::engine::resource_limits::{validate_text_bound, MAX_CODE_BYTES};
+use crate::engine::CodeAnalyzer;
 use serde::Deserialize;
 use serde_json::{json, Value};
 

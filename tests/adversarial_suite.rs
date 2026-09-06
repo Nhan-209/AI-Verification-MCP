@@ -354,8 +354,12 @@ fn test_adversarial_untrusted_domain_cannot_launder_overconfidence() {
 #[test]
 fn test_adversarial_diff_lcs_dos_resistance() {
     // Generate two massive distinct files whose LCS table would normally exceed MAX_LCS_CELLS
-    let before: String = (0..2000).map(|i| format!("fn before_unique_fn_{}() {{}}\n", i)).collect();
-    let after: String = (0..2000).map(|i| format!("fn after_unique_fn_{}() {{}}\n", i)).collect();
+    let before: String = (0..2000)
+        .map(|i| format!("fn before_unique_fn_{}() {{}}\n", i))
+        .collect();
+    let after: String = (0..2000)
+        .map(|i| format!("fn after_unique_fn_{}() {{}}\n", i))
+        .collect();
 
     let diff_report = ai_verification_mcp::engine::DiffAnalyzer::analyze(&before, &after, "rust");
     assert_eq!(diff_report.lines_before, 2000);

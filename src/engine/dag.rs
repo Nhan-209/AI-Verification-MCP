@@ -429,6 +429,9 @@ mod tests {
 
         let json2 = serde_json::to_string(&dag2).unwrap();
 
-        assert_eq!(json1, json2, "PlanDag serialization must be byte-for-byte deterministic regardless of insertion order");
+        assert_eq!(
+            json1, json2,
+            "PlanDag serialization must be byte-for-byte deterministic regardless of insertion order"
+        );
     }
 }

@@ -501,7 +501,9 @@ fn invariant_unapproved_mutation_triggers_critical_block() {
     );
     let violations = res["violations"].as_array().unwrap();
     assert!(
-        violations.iter().any(|v| v["code"] == "UNAPPROVED_MUTATION_SCOPE_CREEP"),
+        violations
+            .iter()
+            .any(|v| v["code"] == "UNAPPROVED_MUTATION_SCOPE_CREEP"),
         "Must raise UNAPPROVED_MUTATION_SCOPE_CREEP"
     );
 }
@@ -543,5 +545,7 @@ fn invariant_execution_receipts_verified_and_failures_block() {
 
     assert_eq!(res_missing_deep["decision"].as_str().unwrap(), "BLOCK");
     let violations_deep = res_missing_deep["violations"].as_array().unwrap();
-    assert!(violations_deep.iter().any(|v| v["code"] == "UNATTESTED_EXECUTION_CLAIM"));
+    assert!(violations_deep
+        .iter()
+        .any(|v| v["code"] == "UNATTESTED_EXECUTION_CLAIM"));
 }

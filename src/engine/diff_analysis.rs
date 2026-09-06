@@ -166,7 +166,11 @@ impl DiffAnalyzer {
             return common_prefix + common_suffix + matched;
         }
 
-        let (short, long) = if a_mid.len() <= b_mid.len() { (a_mid, b_mid) } else { (b_mid, a_mid) };
+        let (short, long) = if a_mid.len() <= b_mid.len() {
+            (a_mid, b_mid)
+        } else {
+            (b_mid, a_mid)
+        };
         let n = short.len();
         let mut prev = vec![0usize; n + 1];
         let mut curr = vec![0usize; n + 1];

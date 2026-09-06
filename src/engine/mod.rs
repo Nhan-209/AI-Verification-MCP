@@ -24,4 +24,3 @@ pub use foresight::{ForesightEngine, ForesightReport};
 pub use receipts::{EvidenceReceipt, ExecutionReceipt, ReceiptsVerificationSummary};
 pub use research_gate::{EvidenceStatus, ResearchGate, ResearchReport};
 pub use resource_limits::*;
-

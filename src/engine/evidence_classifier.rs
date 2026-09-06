@@ -59,13 +59,12 @@ pub const UNTRUSTED_OR_PLACEHOLDER_DOMAINS: &[&str] = &[
 
 /// Curated registry of verified, widely-implemented IETF RFC standards.
 pub const KNOWN_RFC_REGISTRY: &[u32] = &[
-    768, 791, 792, 793, 826, 854, 862, 959, 1034, 1035, 1122, 1123, 1157, 1191, 1213, 1234, 1305,
-    1321, 1332, 1350, 1541, 1542, 1661, 1918, 1939, 1945, 1997, 2024, 2045, 2046, 2068, 2119, 2131,
-    2132, 2205, 2246, 2326, 2328, 2401, 2460, 2616, 2818, 2821, 2822, 3031, 3261, 3315, 3339, 3411,
-    3412, 3414, 3492, 3550, 3986, 4122, 4251, 4252, 4253, 4254, 4301, 4346, 4364, 4648, 4861, 4862,
-    4960, 5246, 5280, 5321, 5322, 5869, 5952, 6066, 6120, 6121, 6265, 6347, 6455, 6749, 6750, 7230,
-    7231, 7232, 7233, 7234, 7235, 7252, 7515, 7519, 7540, 7636, 7644, 7946, 8174, 8200, 8259, 8446,
-    8484, 8999, 9000, 9001, 9110, 9111, 9112, 9113, 9114, 9204, 9218, 9293, 9440,
+    768, 791, 792, 793, 826, 854, 862, 959, 1034, 1035, 1122, 1123, 1157, 1191, 1213, 1234, 1305, 1321, 1332, 1350,
+    1541, 1542, 1661, 1918, 1939, 1945, 1997, 2024, 2045, 2046, 2068, 2119, 2131, 2132, 2205, 2246, 2326, 2328, 2401,
+    2460, 2616, 2818, 2821, 2822, 3031, 3261, 3315, 3339, 3411, 3412, 3414, 3492, 3550, 3986, 4122, 4251, 4252, 4253,
+    4254, 4301, 4346, 4364, 4648, 4861, 4862, 4960, 5246, 5280, 5321, 5322, 5869, 5952, 6066, 6120, 6121, 6265, 6347,
+    6455, 6749, 6750, 7230, 7231, 7232, 7233, 7234, 7235, 7252, 7515, 7519, 7540, 7636, 7644, 7946, 8174, 8200, 8259,
+    8446, 8484, 8999, 9000, 9001, 9110, 9111, 9112, 9113, 9114, 9204, 9218, 9293, 9440,
 ];
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -104,11 +103,17 @@ impl EvidenceClassifier {
             return ProvenanceLevel::SyntacticMarker;
         }
 
-        if UNTRUSTED_OR_PLACEHOLDER_DOMAINS.iter().any(|&d| host == d || host.ends_with(&format!(".{}", d))) {
+        if UNTRUSTED_OR_PLACEHOLDER_DOMAINS
+            .iter()
+            .any(|&d| host == d || host.ends_with(&format!(".{}", d)))
+        {
             return ProvenanceLevel::SyntacticMarker;
         }
 
-        if AUTHORITATIVE_DOMAINS.iter().any(|&d| host == d || host.ends_with(&format!(".{}", d))) {
+        if AUTHORITATIVE_DOMAINS
+            .iter()
+            .any(|&d| host == d || host.ends_with(&format!(".{}", d)))
+        {
             ProvenanceLevel::AuthorityVerified
         } else {
             ProvenanceLevel::SyntacticMarker
@@ -122,7 +127,9 @@ impl EvidenceClassifier {
 
     /// Validates if a string is a clean, non-traversal local file path that exists on disk.
     pub fn is_verified_local_file(path_str: &str) -> bool {
-        let clean = path_str.trim().trim_matches(|c: char| c == '`' || c == '\'' || c == '"' || c == '(' || c == ')');
+        let clean = path_str
+            .trim()
+            .trim_matches(|c: char| c == '`' || c == '\'' || c == '"' || c == '(' || c == ')');
         if clean.contains("..") || clean.is_empty() {
             return false;
         }
@@ -159,7 +166,9 @@ impl EvidenceClassifier {
         }
 
         for word in sentence.split_whitespace() {
-            let clean = word.trim_matches(|c: char| c == '(' || c == ')' || c == '[' || c == ']' || c == '<' || c == '>' || c == ',' || c == ';' || c == '"');
+            let clean = word.trim_matches(|c: char| {
+                c == '(' || c == ')' || c == '[' || c == ']' || c == '<' || c == '>' || c == ',' || c == ';' || c == '"'
+            });
             if clean.starts_with("http://") || clean.starts_with("https://") {
                 let level = Self::classify_url(clean);
                 detected_urls.push(clean.to_string());

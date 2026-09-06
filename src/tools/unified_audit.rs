@@ -1,8 +1,8 @@
 use crate::engine::{
-    CodeAnalyzer, ConfidenceAnalyzer, ConstraintEngine, EvidenceClassifier, ForesightEngine, PlanDag,
-    ResearchGate, TextEvaluator,
     receipts::{EvidenceReceipt, ExecutionReceipt, ReceiptsVerificationSummary},
     resource_limits::*,
+    CodeAnalyzer, ConfidenceAnalyzer, ConstraintEngine, EvidenceClassifier, ForesightEngine, PlanDag, ResearchGate,
+    TextEvaluator,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{json, Value};
@@ -567,7 +567,11 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
         }
 
         let metrics = dag.evaluate_metrics();
-        if metrics.scope_creep_count > 0 && !violations.iter().any(|v| v.code == "SCOPE_CREEP" || v.code == "UNAPPROVED_MUTATION_SCOPE_CREEP") {
+        if metrics.scope_creep_count > 0
+            && !violations
+                .iter()
+                .any(|v| v.code == "SCOPE_CREEP" || v.code == "UNAPPROVED_MUTATION_SCOPE_CREEP")
+        {
             add_violation(
                 &mut violations,
                 &mut critical_violations,
@@ -645,10 +649,7 @@ pub fn execute_unified_audit(args: Value) -> Result<Value, String> {
                             &mut critical_violations,
                             &mut recommendations,
                             "UNATTESTED_EXECUTION_CLAIM",
-                            format!(
-                                "Executed step '{}' is missing execution receipt verification.",
-                                step
-                            ),
+                            format!("Executed step '{}' is missing execution receipt verification.", step),
                             ViolationSeverity::Warning,
                             "Provide ExecutionReceipts to verify execution integrity.",
                         );
@@ -1161,7 +1162,9 @@ mod tests {
         assert_eq!(val["decision"], "BLOCK");
         assert_eq!(val["verdict"], "FAIL");
         let violations = val["violations"].as_array().unwrap();
-        assert!(violations.iter().any(|v| v["code"] == "UNAPPROVED_MUTATION_SCOPE_CREEP"));
+        assert!(violations
+            .iter()
+            .any(|v| v["code"] == "UNAPPROVED_MUTATION_SCOPE_CREEP"));
     }
 
     #[test]

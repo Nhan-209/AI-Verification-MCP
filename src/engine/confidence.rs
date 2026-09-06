@@ -116,7 +116,9 @@ impl ConfidenceAnalyzer {
             0.0
         };
 
-        let has_hard_evidence = EvidenceClassifier::classify_sentence(trimmed).max_provenance.is_grounded()
+        let has_hard_evidence = EvidenceClassifier::classify_sentence(trimmed)
+            .max_provenance
+            .is_grounded()
             || trimmed.to_lowercase().contains("benchmark")
             || trimmed.to_lowercase().contains("coverage")
             || (trimmed.contains('/')
