@@ -72,7 +72,10 @@ pub fn handle_request(req: JsonRpcRequest) -> Option<JsonRpcResponse> {
                         result: None,
                         error: Some(JsonRpcError {
                             code: -32602,
-                            message: format!("Unsupported protocolVersion '{}'; supported versions are 2026-07-28 and 2024-11-05", unsupported),
+                            message: format!(
+                                "Unsupported protocolVersion '{}'; supported versions are 2026-07-28 and 2024-11-05",
+                                unsupported
+                            ),
                             data: Some(json!({"supportedProtocolVersions": ["2026-07-28", "2024-11-05"]})),
                         }),
                     });
@@ -228,7 +231,10 @@ mod tests {
         let error = res.error.expect("Unsupported versions must be rejected");
         assert_eq!(error.code, -32602);
         assert!(error.message.contains("Unsupported protocolVersion"));
-        assert_eq!(error.data.unwrap()["supportedProtocolVersions"], json!(["2026-07-28", "2024-11-05"]));
+        assert_eq!(
+            error.data.unwrap()["supportedProtocolVersions"],
+            json!(["2026-07-28", "2024-11-05"])
+        );
     }
 
     #[test]
