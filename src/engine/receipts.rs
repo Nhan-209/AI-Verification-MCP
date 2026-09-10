@@ -17,6 +17,21 @@ fn days_from_civil(y: i64, m: u32, d: u32) -> i64 {
     era * 146097 + doe as i64 - 719468
 }
 
+fn is_valid_calendar_date(year: i64, month: u32, day: u32) -> bool {
+    if !(1..=12).contains(&month) || day == 0 {
+        return false;
+    }
+    let leap = (year % 4 == 0 && year % 100 != 0) || year % 400 == 0;
+    let max_day = match month {
+        1 | 3 | 5 | 7 | 8 | 10 | 12 => 31,
+        4 | 6 | 9 | 11 => 30,
+        2 if leap => 29,
+        2 => 28,
+        _ => unreachable!(),
+    };
+    day <= max_day
+}
+
 /// Parses an RFC 3339 / ISO 8601 timestamp string into epoch seconds (as f64).
 pub fn parse_rfc3339(s: &str) -> Option<f64> {
     let clean = s.trim();
@@ -34,7 +49,7 @@ pub fn parse_rfc3339(s: &str) -> Option<f64> {
     let minute = clean[14..16].parse::<u32>().ok()?;
     let second = clean[17..19].parse::<u32>().ok()?;
 
-    if !(1..=12).contains(&month) || !(1..=31).contains(&day) || hour > 23 || minute > 59 || second > 60 {
+    if !is_valid_calendar_date(year, month, day) || hour > 23 || minute > 59 || second > 60 {
         return None;
     }
 
@@ -221,7 +236,15 @@ impl EvidenceReceipt {
         let kind_upper = self.kind.trim().to_uppercase();
         if kind_upper == "FILE" {
             let clean = self.source_id.trim();
-            if clean.contains("..") || clean.is_empty() {
+            let path = std::path::Path::new(clean);
+            // Evidence paths must stay within the workspace; reject traversal,
+            // absolute paths, and Windows drive/UNC forms before filesystem use.
+            if clean.is_empty()
+                || path.is_absolute()
+                || clean.contains("..")
+                || clean.starts_with('\\')
+                || clean.contains(':')
+            {
                 return false;
             }
         }
@@ -285,7 +308,8 @@ mod tests {
         assert!(parse_rfc3339("2026-09-06T14:30:00.123456Z").is_some());
         assert!(parse_rfc3339("2026-09-06T14:30:00+07:00").is_some());
         assert!(parse_rfc3339("not-a-date").is_none());
-        assert!(parse_rfc3339("2026-02-30T10:00:00Z").is_some()); // civil parser handles day <= 31
+        assert!(parse_rfc3339("2026-02-30T10:00:00Z").is_none());
+        assert!(parse_rfc3339("2024-02-29T10:00:00Z").is_some());
     }
 
     #[test]
@@ -376,5 +400,13 @@ mod tests {
             ..valid_test
         };
         assert!(!traversal_file.is_valid_evidence());
+
+        let absolute_file = EvidenceReceipt {
+            kind: "FILE".to_string(),
+            source_id: "/etc/passwd".to_string(),
+            sha256: None,
+            ..valid_test
+        };
+        assert!(!absolute_file.is_valid_evidence());
     }
 }
