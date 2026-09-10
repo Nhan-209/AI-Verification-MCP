@@ -32,13 +32,51 @@ pub fn handle_request(req: JsonRpcRequest) -> Option<JsonRpcResponse> {
     let response = match method {
         "initialize" => {
             let params = req.params.unwrap_or(Value::Null);
+            if !params.is_null() && !params.is_object() {
+                return Some(JsonRpcResponse {
+                    jsonrpc: "2.0".to_string(),
+                    id,
+                    result: None,
+                    error: Some(JsonRpcError {
+                        code: -32602,
+                        message: "Invalid params: initialize params must be an object".to_string(),
+                        data: None,
+                    }),
+                });
+            }
+            if let Some(version) = params.get("protocolVersion") {
+                if !version.is_string() {
+                    return Some(JsonRpcResponse {
+                        jsonrpc: "2.0".to_string(),
+                        id,
+                        result: None,
+                        error: Some(JsonRpcError {
+                            code: -32602,
+                            message: "Invalid params: protocolVersion must be a string".to_string(),
+                            data: None,
+                        }),
+                    });
+                }
+            }
             let requested_version = params
                 .get("protocolVersion")
                 .and_then(|v| v.as_str())
                 .unwrap_or("2026-07-28");
             let negotiated_version = match requested_version {
                 "2024-11-05" => "2024-11-05",
-                _ => "2026-07-28",
+                "2026-07-28" => "2026-07-28",
+                unsupported => {
+                    return Some(JsonRpcResponse {
+                        jsonrpc: "2.0".to_string(),
+                        id,
+                        result: None,
+                        error: Some(JsonRpcError {
+                            code: -32602,
+                            message: format!("Unsupported protocolVersion '{}'; supported versions are 2026-07-28 and 2024-11-05", unsupported),
+                            data: Some(json!({"supportedProtocolVersions": ["2026-07-28", "2024-11-05"]})),
+                        }),
+                    });
+                }
             };
             JsonRpcResponse {
                 jsonrpc: "2.0".to_string(),
@@ -176,6 +214,33 @@ mod tests {
         assert!(res.error.is_none());
         let result = res.result.unwrap();
         assert_eq!(result["serverInfo"]["name"], "ai-verification-mcp");
+    }
+
+    #[test]
+    fn test_initialize_rejects_unsupported_protocol_version() {
+        let req = JsonRpcRequest {
+            jsonrpc: "2.0".to_string(),
+            id: Some(json!(6)),
+            method: "initialize".to_string(),
+            params: Some(json!({"protocolVersion": "2099-01-01"})),
+        };
+        let res = handle_request(req).expect("Should return response");
+        let error = res.error.expect("Unsupported versions must be rejected");
+        assert_eq!(error.code, -32602);
+        assert!(error.message.contains("Unsupported protocolVersion"));
+        assert_eq!(error.data.unwrap()["supportedProtocolVersions"], json!(["2026-07-28", "2024-11-05"]));
+    }
+
+    #[test]
+    fn test_initialize_rejects_non_object_params() {
+        let req = JsonRpcRequest {
+            jsonrpc: "2.0".to_string(),
+            id: Some(json!(7)),
+            method: "initialize".to_string(),
+            params: Some(json!(["2026-07-28"])),
+        };
+        let res = handle_request(req).expect("Should return response");
+        assert_eq!(res.error.expect("Invalid params must be rejected").code, -32602);
     }
 
     #[test]
